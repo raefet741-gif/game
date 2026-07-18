@@ -20,8 +20,21 @@
 // Socket.IO namespace ("/words").
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, spendCoins } from "./accounts.js";
 import { WORD_LIST } from "./words-data.js";
+
+// The dictionary is English. Exposed to clients (in state) so the board can show
+// players which language the puzzle words are in — change this if the word list
+// is ever swapped for another language.
+export const PUZZLE_LANG = "en";
+
+// Solo-only power-up cards, paid for with coins:
+//   • hint   — reveals a single hidden letter of a word (a small clue).
+//   • reveal — solves one whole word for you.
+export const POWERUPS = {
+  hint: { cost: 8 },
+  reveal: { cost: 20 },
+};
 
 const rooms = new Map(); // code -> WordsRoom
 let ioNsp = null;
@@ -100,6 +113,17 @@ function letterCounts(word) {
   const c = {};
   for (const ch of word) c[ch] = (c[ch] || 0) + 1;
   return c;
+}
+
+// The "r,c" grid keys every cell of a placed slot occupies.
+function slotCells(slot) {
+  const dr = slot.dir === "V" ? 1 : 0;
+  const dc = slot.dir === "H" ? 1 : 0;
+  const out = [];
+  for (let i = 0; i < slot.word.length; i++) {
+    out.push(`${slot.row + dr * i},${slot.col + dc * i}`);
+  }
+  return out;
 }
 
 // Every dictionary word (len 3..base.length) spellable from base's letters,
@@ -334,6 +358,7 @@ class WordsRoom {
       // per-round
       foundSlots: new Set(),
       bonusWords: new Set(),
+      hintCells: new Map(), // "r,c" -> letter, revealed by the hint power-up
       finished: false,
       finishMs: null,
       // cumulative
@@ -445,6 +470,7 @@ class WordsRoom {
     for (const p of this.players) {
       p.foundSlots = new Set();
       p.bonusWords = new Set();
+      p.hintCells = new Map();
       p.finished = false;
       p.finishMs = null;
     }
@@ -589,6 +615,92 @@ class WordsRoom {
     }
   }
 
+  // ---------- solo power-ups ----------
+  // Decide what a power-up would reveal (without applying it), or null if there's
+  // nothing left to reveal — so we never charge coins for a no-op.
+  pickPowerupTarget(player, kind) {
+    const slots = this.puzzle.layout.slots;
+    const found = this.foundSetFor(player);
+
+    if (kind === "reveal") {
+      const remaining = slots.filter((s) => !found.has(s.id));
+      if (!remaining.length) return null;
+      const slot = remaining[Math.floor(Math.random() * remaining.length)];
+      return { slot };
+    }
+
+    // hint: cells already on the board = every cell of a found word + prior hints.
+    const visible = new Set(player.hintCells.keys());
+    for (const s of slots) {
+      if (!found.has(s.id)) continue;
+      for (const c of slotCells(s)) visible.add(c);
+    }
+    // Prefer the unfound word with the fewest letters already shown, then reveal
+    // its first still-hidden cell — a natural "starter" clue.
+    let best = null;
+    for (const s of slots) {
+      if (found.has(s.id)) continue;
+      const cells = slotCells(s);
+      const hidden = cells.filter((c) => !visible.has(c));
+      if (!hidden.length) continue;
+      const shown = cells.length - hidden.length;
+      if (!best || shown < best.shown) best = { shown, key: hidden[0], slot: s };
+    }
+    if (!best) return null;
+    const s = best.slot;
+    const [r, c] = best.key.split(",").map(Number);
+    const i = s.dir === "V" ? r - s.row : c - s.col;
+    return { key: best.key, letter: s.word[i].toUpperCase() };
+  }
+
+  // Spend coins to reveal a letter (hint) or a whole word (reveal). Solo only, so
+  // it never affects a competitive race. Charges only after confirming the action
+  // will do something and the player can afford it.
+  usePowerup(playerId, kind) {
+    if (this.settings.mode !== "solo") return { error: "wow_err_solo_only" };
+    if (this.status !== "playing") return { error: "wow_err_not_playing" };
+    const def = POWERUPS[kind];
+    if (!def) return { error: "wow_err_glitch" };
+    const p = this.getPlayer(playerId);
+    if (!p || !p.connected) return { error: "wow_err_glitch" };
+    if (!p.userId) return { error: "wow_err_login" };
+    if (this.unitFinished(p)) return { error: "wow_err_done" };
+
+    const target = this.pickPowerupTarget(p, kind);
+    if (!target) return { error: "wow_err_nothing" };
+
+    const spend = spendCoins(p.userId, def.cost);
+    if (spend.error) return { error: "wow_err_coins" };
+
+    if (kind === "reveal") {
+      const slot = target.slot;
+      const found = this.foundSetFor(p);
+      found.add(slot.id);
+      this.revealToUnit(p, slot);
+      const done = found.size >= this.puzzle.total;
+      if (done) this.markFinished(p);
+      this.broadcast();
+      if (done && !this.roundWinner) this.endRound(p);
+      return {
+        status: "ok", kind, cost: def.cost, coins: spend.coins,
+        reveal: { slotId: slot.id, word: slot.word.toUpperCase() },
+        finished: done,
+      };
+    }
+
+    // hint
+    p.hintCells.set(target.key, target.letter);
+    const [row, col] = target.key.split(",").map(Number);
+    if (p.socketId && ioNsp) {
+      ioNsp.to(p.socketId).emit("wow_hint", { row, col, letter: target.letter });
+    }
+    this.broadcast();
+    return {
+      status: "ok", kind, cost: def.cost, coins: spend.coins,
+      hint: { row, col, letter: target.letter },
+    };
+  }
+
   finishGame() {
     this.status = "finished";
     this.result = this.buildResult();
@@ -681,6 +793,7 @@ class WordsRoom {
     for (const p of this.players) {
       p.foundSlots = new Set();
       p.bonusWords = new Set();
+      p.hintCells = new Map();
       p.finished = false;
       p.finishMs = null;
       p.roundWins = 0;
@@ -756,7 +869,18 @@ class WordsRoom {
       roundStartMs: this.roundStartMs,
       roundWinner: this.roundWinner,
       result: this.result,
+      wordLang: PUZZLE_LANG,
+      powerups: POWERUPS,
     };
+  }
+
+  // Individual letters this player revealed with the hint power-up — sent on round
+  // start / reconnect so the clues survive a page reload.
+  hintReveal(player) {
+    return [...player.hintCells.entries()].map(([key, letter]) => {
+      const [row, col] = key.split(",").map(Number);
+      return { row, col, letter };
+    });
   }
 
   // The slots (with letters) that a player's unit has already found — used to
@@ -785,6 +909,7 @@ class WordsRoom {
       layout: this.publicLayout(),
       total: this.puzzle.total,
       found: this.foundReveal(player),
+      hints: this.hintReveal(player),
       bonus: [...player.bonusWords].map((w) => w.toUpperCase()),
     });
   }
@@ -913,6 +1038,15 @@ export function attachWordsIO(io, serverUrl) {
       const { room, player } = ctx(socket);
       if (!room || !player) return ack(cb, { status: "none" });
       ack(cb, room.submitWord(player.id, word));
+    });
+
+    // Solo power-up purchase resolves via ack (so the client learns the new coin
+    // balance) and its own broadcast for the board reveal.
+    socket.on("wow_powerup", ({ kind } = {}, cb) => {
+      const { room, player } = ctx(socket);
+      if (!room || !player) return ack(cb, { error: "wow_err_no_room" });
+      const res = room.usePowerup(player.id, kind);
+      ack(cb, res);
     });
 
     socket.on("wow_next", () =>

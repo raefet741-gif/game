@@ -238,6 +238,20 @@ export function grantReward(userId, { xpGain = 0, coinGain = 0, won = false, pla
   return { xpGain, coinGain, won, unlocked, profile: publicProfile(user) };
 }
 
+// Spend coins from a logged-in user (used by in-game shops like the WORD WONDERS
+// solo power-up cards). Returns {ok, coins, profile} on success, or {error} if the
+// user is unknown or can't afford it — the caller decides what to do on failure.
+export function spendCoins(userId, amount) {
+  const db = getDB();
+  const user = db.users[userId];
+  if (!user) return { error: "no_user" };
+  const cost = Math.max(0, Math.round(amount));
+  if ((user.coins || 0) < cost) return { error: "insufficient" };
+  user.coins -= cost;
+  saveStore();
+  return { ok: true, coins: user.coins, profile: publicProfile(user) };
+}
+
 // Called when a game ends — award XP + achievements to any logged-in players.
 // Returns per-player results so the caller can notify each socket.
 export function awardGameResults(room) {

@@ -69,6 +69,15 @@ const T = {
     err_generic: "Something glitched — try again.",
     solo_hint: "Solo is best played alone — invite friends only in Versus or Teams.",
     swipe_hint: "Swipe across the letters to spell a word",
+    word_lang: "Words are in", lang_en: "English", lang_fr: "French", lang_ar: "Arabic",
+    powerups: "Power-up cards", your_coins: "Your coins",
+    pu_hint: "Reveal a letter", pu_hint_d: "Uncover one hidden letter as a clue.",
+    pu_reveal: "Reveal a word", pu_reveal_d: "Solve a whole word for you.",
+    pu_login: "Log in on the home page to buy power-up cards with your coins.",
+    pu_revealed: "Revealed!", pu_letter_clue: "Clue letter!",
+    err_coins: "Not enough coins for that card.",
+    err_nothing: "Nothing left to reveal.",
+    err_pu_login: "Log in to use power-up cards.",
   },
   fr: {
     brand: "WORD WONDERS",
@@ -107,6 +116,15 @@ const T = {
     err_generic: "Un bug — réessaie.",
     solo_hint: "Le solo se joue seul — invite des amis en Versus ou Équipes.",
     swipe_hint: "Glisse sur les lettres pour former un mot",
+    word_lang: "Les mots sont en", lang_en: "anglais", lang_fr: "français", lang_ar: "arabe",
+    powerups: "Cartes d'aide", your_coins: "Tes pièces",
+    pu_hint: "Révéler une lettre", pu_hint_d: "Dévoile une lettre cachée comme indice.",
+    pu_reveal: "Révéler un mot", pu_reveal_d: "Résout un mot entier pour toi.",
+    pu_login: "Connecte-toi sur l'accueil pour acheter des cartes avec tes pièces.",
+    pu_revealed: "Révélé !", pu_letter_clue: "Lettre indice !",
+    err_coins: "Pas assez de pièces pour cette carte.",
+    err_nothing: "Plus rien à révéler.",
+    err_pu_login: "Connecte-toi pour utiliser les cartes d'aide.",
   },
   ar: {
     brand: "WORD WONDERS",
@@ -145,6 +163,15 @@ const T = {
     err_generic: "حدث خلل — حاول مجددًا.",
     solo_hint: "الوضع الفردي يُلعب بمفردك — ادعُ أصدقاءك في التنافسي أو الفرق.",
     swipe_hint: "اسحب على الحروف لتكوين كلمة",
+    word_lang: "الكلمات باللغة", lang_en: "الإنجليزية", lang_fr: "الفرنسية", lang_ar: "العربية",
+    powerups: "بطاقات المساعدة", your_coins: "عملاتك",
+    pu_hint: "اكشف حرفًا", pu_hint_d: "يكشف حرفًا مخفيًا واحدًا كتلميح.",
+    pu_reveal: "اكشف كلمة", pu_reveal_d: "يحل كلمة كاملة من أجلك.",
+    pu_login: "سجّل الدخول من الصفحة الرئيسية لشراء البطاقات بعملاتك.",
+    pu_revealed: "تم الكشف!", pu_letter_clue: "حرف تلميح!",
+    err_coins: "عملات غير كافية لهذه البطاقة.",
+    err_nothing: "لا شيء متبقٍ للكشف.",
+    err_pu_login: "سجّل الدخول لاستخدام بطاقات المساعدة.",
   },
 };
 const t = (k) => (T[lang] || T.en)[k] || T.en[k] || k;
@@ -156,8 +183,13 @@ const ERR_MAP = {
   wow_err_need_teams: "need_teams",
   wow_err_started: "err_started",
   wow_err_no_code: "err_no_code",
+  wow_err_coins: "err_coins",
+  wow_err_nothing: "err_nothing",
+  wow_err_login: "err_pu_login",
 };
 const tErr = (key) => t(ERR_MAP[key] || "err_generic");
+// Localized name of a word-language code (e.g. "en" -> "English"/"anglais").
+const langName = (code) => t("lang_" + (code || "en")) || (code || "en");
 
 /* ---------------- session ---------------- */
 function loadSession() {
@@ -167,6 +199,17 @@ function loadSession() {
 function saveSession(s) { session = s; localStorage.setItem("words.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("words.session"); }
 function getToken() { return localStorage.getItem("kyuubi.token"); }
+// Pull the logged-in profile so we can show the coin balance and enable the solo
+// power-up cards. Guests (no token) stay null and just see a "log in" prompt.
+function refreshAccount() {
+  const token = getToken();
+  if (!token) { account = null; return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { account = (d && d.profile) || null; if (state) render(); })
+    .catch(() => {});
+}
+function myCoins() { return account ? account.coins || 0 : 0; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -175,6 +218,8 @@ let session = loadSession();
 let pre = "landing"; // landing | create | join
 let drafts = { name: "", color: "", joinCode: "" };
 let hadFirstConnect = false;
+let account = null; // logged-in profile ({coins,...}) or null for guests
+let buying = false; // guards against double-buying a power-up card
 
 // Local board for the current round.
 let board = {
@@ -184,6 +229,7 @@ let board = {
   total: 0,
   foundWords: new Map(), // slotId -> WORD
   bonus: new Set(),   // bonus WORDS this player found
+  hintCells: new Map(), // "r,c" -> letter revealed by the hint power-up
 };
 let roundStartLocal = 0;
 let tickHandle = null;
@@ -241,9 +287,11 @@ function resetBoard(p) {
     total: p?.total || 0,
     foundWords: new Map(),
     bonus: new Set(),
+    hintCells: new Map(),
   };
   for (const f of p?.found || []) board.foundWords.set(f.slotId, f.word);
   for (const w of p?.bonus || []) board.bonus.add(w);
+  for (const h of p?.hints || []) board.hintCells.set(`${h.row},${h.col}`, h.letter);
   sel = []; selecting = false; pointerXY = null;
   roundStartLocal = Date.now();
 }
@@ -283,6 +331,7 @@ function myFoundCount() {
 socket.on("connect", () => {
   const firstLoad = !hadFirstConnect;
   hadFirstConnect = true;
+  refreshAccount();
   if (session?.code && session?.playerId) {
     socket.emit("wow_join", { code: session.code, playerId: session.playerId, token: getToken() }, (res) => {
       if (!res?.ok) { clearSession(); state = null; render(); return; }
@@ -312,6 +361,12 @@ socket.on("wow_found", ({ slotId, word, by }) => {
     if (by !== myId()) sfx.click();
     render();
   }
+});
+
+socket.on("wow_hint", ({ row, col, letter }) => {
+  board.hintCells.set(`${row},${col}`, letter);
+  sfx.click();
+  render();
 });
 
 socket.on("wow_roundover", ({ answers }) => {
@@ -433,6 +488,38 @@ function flashMsg(kind, text) {
   flash = { kind, text };
   render();
   setTimeout(() => { flash = null; render(); }, 900);
+}
+
+/* ---------------- solo power-up cards ---------------- */
+function powerupCost(kind) {
+  const p = state && state.powerups && state.powerups[kind];
+  return p ? p.cost : kind === "reveal" ? 20 : 8;
+}
+function buyPowerup(kind) {
+  if (buying) return;
+  if (!account) return toast(t("err_pu_login"), "error");
+  if (myCoins() < powerupCost(kind)) return toast(t("err_coins"), "error");
+  buying = true;
+  render(); // disable the buttons while the purchase is in flight
+  socket.emit("wow_powerup", { kind }, (res) => {
+    buying = false;
+    if (!res || res.error) {
+      if (res && res.error) toast(tErr(res.error), "error");
+      return render();
+    }
+    if (res.coins != null && account) account.coins = res.coins;
+    if (res.kind === "reveal") {
+      if (res.reveal) board.foundWords.set(res.reveal.slotId, res.reveal.word);
+      sfx.point();
+      flashMsg("ok", t("pu_revealed"));
+      if (res.finished) { confettiBurst(); sfx.win(); }
+    } else {
+      if (res.hint) board.hintCells.set(`${res.hint.row},${res.hint.col}`, res.hint.letter);
+      sfx.point();
+      flashMsg("bonus", t("pu_letter_clue"));
+    }
+    render();
+  });
 }
 
 /* ---------------- swipe wheel ---------------- */
@@ -635,6 +722,7 @@ function renderLobby() {
             <div class="ww-label">${t("room_code")}</div>
             <div class="ww-code">${esc(state.code)}</div>
             <div class="ww-hint">${t("share_hint")}</div>
+            ${langBadge()}
           </div>
           <img class="ww-qr" src="${qr}" alt="QR" onerror="this.style.display='none'" />
         </div>
@@ -657,7 +745,10 @@ function crosswordHTML() {
       const key = `${r},${c}`;
       if (!active.has(key)) { cells.push(`<div class="ww-cell blank"></div>`); continue; }
       const letter = letters.get(key);
-      cells.push(`<div class="ww-cell ${letter ? "filled" : "empty"}">${letter ? esc(letter) : ""}</div>`);
+      if (letter) { cells.push(`<div class="ww-cell filled">${esc(letter)}</div>`); continue; }
+      // Not yet part of a found word — but a hint card may have exposed this letter.
+      const hint = board.hintCells.get(key);
+      cells.push(`<div class="ww-cell ${hint ? "hint" : "empty"}">${hint ? esc(hint) : ""}</div>`);
     }
   }
   return `<div class="ww-grid" style="grid-template-columns:repeat(${cols},1fr)">${cells.join("")}</div>`;
@@ -708,6 +799,44 @@ function progressList() {
   }).join("");
 }
 
+// A small badge telling players which language the puzzle words are in.
+function langBadge() {
+  const code = state?.wordLang || "en";
+  return `<div class="ww-langbadge">🌐 ${t("word_lang")} <b>${esc(langName(code))}</b></div>`;
+}
+
+// Solo-only shop: buy a letter clue or a full-word reveal with coins.
+function powerupsHTML() {
+  if (state?.settings?.mode !== "solo") return "";
+  if (myPlayer()?.finished) return "";
+  if (!account) {
+    return `<div class="ww-powerups locked">
+      <div class="ww-pu-title">🃏 ${t("powerups")}</div>
+      <div class="ww-hint">${t("pu_login")}</div>
+    </div>`;
+  }
+  const card = (kind, emoji, nameKey, descKey) => {
+    const c = powerupCost(kind);
+    const enabled = myCoins() >= c && !buying;
+    return `<button class="ww-pu ${myCoins() >= c ? "" : "poor"}" data-pu="${kind}" ${enabled ? "" : "disabled"}>
+      <span class="ww-pu-emoji">${emoji}</span>
+      <span class="ww-pu-name">${t(nameKey)}</span>
+      <span class="ww-pu-d">${t(descKey)}</span>
+      <span class="ww-pu-cost">🪙 ${c}</span>
+    </button>`;
+  };
+  return `<div class="ww-powerups">
+    <div class="ww-pu-head">
+      <span class="ww-pu-title">🃏 ${t("powerups")}</span>
+      <span class="ww-pu-coins">${t("your_coins")}: <b>🪙 ${myCoins()}</b></span>
+    </div>
+    <div class="ww-pu-row">
+      ${card("hint", "🔍", "pu_hint", "pu_hint_d")}
+      ${card("reveal", "💡", "pu_reveal", "pu_reveal_d")}
+    </div>
+  </div>`;
+}
+
 function renderPlaying() {
   const me = myPlayer();
   const finishedMe = isTeams()
@@ -734,9 +863,11 @@ function renderPlaying() {
         <div class="ww-hud-item"><span class="ww-hud-k">${t("time")}</span><span class="ww-hud-v" id="wow-timer">${liveTime()}</span></div>
         <div class="ww-hud-item"><span class="ww-hud-k">${t("bonus")}</span><span class="ww-hud-v">${board.bonus.size}</span></div>
       </div>
+      ${langBadge()}
       ${crosswordHTML()}
       ${bonusList ? `<div class="ww-bonus">${bonusList}</div>` : ""}
       ${playArea}
+      ${powerupsHTML()}
       <div class="ww-progress">${progressList()}</div>
       ${isHost() ? `<div class="ww-host-row">
         <button class="ww-link" data-act="end-round">${t("end_round")}</button>
@@ -849,6 +980,9 @@ $app.addEventListener("click", (e) => {
 
   const team = e.target.closest("[data-team]");
   if (team) return socket.emit("wow_join_team", { team: Number(team.dataset.team) });
+
+  const pu = e.target.closest("[data-pu]");
+  if (pu && !pu.disabled) return buyPowerup(pu.dataset.pu);
 
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (!act) return;

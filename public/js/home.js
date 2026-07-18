@@ -44,6 +44,8 @@ const T = {
     puzzle_tag: "Drag the pieces to rebuild the picture. Solo or race friends — or turn a selfie into an AI puzzle.",
     words_name: "WORD WONDERS",
     words_tag: "Swipe the letter wheel to spell words and fill the crossword. Play solo, versus, or in teams — first to finish wins.",
+    draw_name: "DOODLE DUEL",
+    draw_tag: "Sketch the word and let the AI or the room judge it — or pass drawings around the circle and guess your way to points.",
     headsup_name: "HEADS UP",
     headsup_tag: "Guess what's on your card while the room gives you clues. Your own photo packs, coming next.",
     more: "More games coming",
@@ -86,6 +88,8 @@ const T = {
     puzzle_tag: "Glisse les pièces pour reconstruire l'image. Solo ou contre tes amis — ou transforme un selfie en puzzle IA.",
     words_name: "WORD WONDERS",
     words_tag: "Glisse sur la roue de lettres pour former des mots et remplir la grille. Solo, versus ou en équipes — le premier à finir gagne.",
+    draw_name: "DOODLE DUEL",
+    draw_tag: "Dessine le mot et laisse l'IA ou la salle juger — ou fais tourner les dessins dans le cercle et devine pour marquer des points.",
     headsup_name: "DEVINE",
     headsup_tag: "Devine ce que tu as pendant que la salle te donne des indices. Tes propres packs photos, bientôt.",
     more: "D'autres jeux arrivent",
@@ -127,6 +131,8 @@ const T = {
     puzzle_tag: "اسحب القطع لإعادة تركيب الصورة. منفردًا أو ضد أصدقائك — أو حوّل سيلفي إلى أحجية بالذكاء الاصطناعي.",
     words_name: "عجائب الكلمات",
     words_tag: "اسحب على عجلة الحروف لتكوين الكلمات وملء الشبكة. فردي أو تنافسي أو بالفرق — أول من ينهي يفوز.",
+    draw_name: "مبارزة الرسم",
+    draw_tag: "ارسم الكلمة ودع الذكاء الاصطناعي أو الغرفة يحكم — أو مرّر الرسوم في الحلقة وخمّن لتجمع النقاط.",
     headsup_name: "خمّن",
     headsup_tag: "خمّن ما على بطاقتك بينما تعطيك الغرفة تلميحات. حزم صورك الخاصة قريبًا.",
     more: "المزيد من الألعاب قريبًا",
@@ -319,6 +325,7 @@ const GAMES = [
   { id: "sudoku", href: "/sudoku", emoji: "🔢", accent: "var(--green)", name: () => t("sudoku_name"), tag: () => t("sudoku_tag"), pill: { en: "Team vs team", fr: "Équipe vs équipe", ar: "فريق ضد فريق" }, ready: true },
   { id: "puzzle", href: "/puzzle", emoji: "🧩", accent: "var(--gold)", name: () => t("puzzle_name"), tag: () => t("puzzle_tag"), pill: { en: "Jigsaw · AI", fr: "Puzzle · IA", ar: "أحجية · ذكاء" }, ready: true },
   { id: "words", href: "/words", emoji: "🔤", accent: "var(--pink)", name: () => t("words_name"), tag: () => t("words_tag"), pill: { en: "Word race", fr: "Course de mots", ar: "سباق الكلمات" }, ready: true },
+  { id: "draw", href: "/draw", emoji: "🎨", accent: "var(--violet)", name: () => t("draw_name"), tag: () => t("draw_tag"), pill: { en: "Draw · AI · Guess", fr: "Dessin · IA · Devine", ar: "رسم · ذكاء · تخمين" }, ready: true },
   { id: "headsup", href: "#", emoji: "🧠", accent: "var(--violet)", name: () => t("headsup_name"), tag: () => t("headsup_tag"), pill: { en: "Guessing", fr: "Devinettes", ar: "تخمين" }, ready: false },
 ];
 function cardHTML(g, i) {
@@ -566,16 +573,8 @@ function attachTilt() {
   requestAnimationFrame(frame);
 })();
 
-/* ---------------- background video: play once, freeze on last frame ---------------- */
-(function bgVideo() {
-  const vid = document.getElementById("bgvid");
-  if (vid) {
-    const tryPlay = () => { const p = vid.play(); if (p && p.catch) p.catch(() => {}); };
-    tryPlay();
-    const kick = () => { tryPlay(); window.removeEventListener("pointerdown", kick); };
-    window.addEventListener("pointerdown", kick, { once: true });
-    vid.addEventListener("ended", () => { try { vid.pause(); } catch {} });
-  }
+/* ---------------- background: static image + scroll hint ---------------- */
+(function bgScroll() {
   window.addEventListener("scroll", () => {
     const hint = document.getElementById("scrollHint");
     if (hint) hint.classList.toggle("hide", (window.scrollY || 0) > 40);

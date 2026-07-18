@@ -24,6 +24,7 @@ import {
 import { attachMemoryIO, sweepMemoryRooms } from "./memory.js";
 import { attachSudokuIO, sweepSudokuRooms } from "./sudoku.js";
 import { attachWordsIO, sweepWordsRooms } from "./words.js";
+import { attachDrawIO, sweepDrawRooms } from "./draw.js";
 import {
   attachPuzzleIO,
   sweepPuzzleRooms,
@@ -183,6 +184,7 @@ app.get(["/memory", "/memory/"], (_req, res) => res.sendFile(path.join(PUBLIC_DI
 app.get(["/sudoku", "/sudoku/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "sudoku.html")));
 app.get(["/puzzle", "/puzzle/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "puzzle.html")));
 app.get(["/words", "/words/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "words.html")));
+app.get(["/draw", "/draw/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "draw.html")));
 
 app.use(express.static(PUBLIC_DIR));
 // Everything else falls back to the arcade home.
@@ -197,6 +199,7 @@ attachMemoryIO(io, SERVER_URL);
 attachSudokuIO(io, SERVER_URL);
 attachPuzzleIO(io, SERVER_URL);
 attachWordsIO(io, SERVER_URL);
+attachDrawIO(io, SERVER_URL);
 
 // ---- helpers ----
 function ctx(socket) {
@@ -457,6 +460,7 @@ setInterval(() => {
   sweepSudokuRooms();
   sweepPuzzleRooms();
   sweepWordsRooms();
+  sweepDrawRooms();
 }, 60 * 1000);
 
 server.listen(PORT, "0.0.0.0", () => {

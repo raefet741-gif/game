@@ -173,6 +173,11 @@
   background: linear-gradient(180deg, var(--cyan), #17b3ab); color: var(--ink);
   animation: ww-pop 0.28s ease;
 }
+/* A single letter exposed by the "reveal a letter" hint card. */
+.ww-cell.hint {
+  background: linear-gradient(180deg, var(--gold), #f0a92e); color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.2); animation: ww-pop 0.28s ease;
+}
 @keyframes ww-pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
 .ww-solved .ww-grid { max-width: 320px; }
@@ -257,6 +262,45 @@
 .ww-champ { border-color: var(--tc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc) 40%, transparent), 0 14px 34px rgba(0,0,0,0.4); }
 .ww-champ-label { text-transform: uppercase; letter-spacing: 0.14em; color: #b9b9dd; font-size: 13px; }
 .ww-champ-name { font-family: "Anton", sans-serif; font-size: 40px; }
+
+/* ---------- language badge ---------- */
+.ww-langbadge {
+  display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 4px;
+  font-size: 12.5px; color: #cdcdea; padding: 4px 11px; border-radius: 999px;
+  background: color-mix(in srgb, var(--cyan) 14%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--cyan) 45%, transparent);
+}
+.ww-langbadge b { color: var(--cyan); text-transform: capitalize; }
+
+/* ---------- solo power-up cards ---------- */
+.ww-powerups {
+  width: 100%; max-width: 460px; margin: 6px auto 2px;
+  background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 11px 12px;
+}
+.ww-powerups.locked { text-align: center; }
+.ww-pu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.ww-pu-title { font-size: 13px; font-weight: 800; letter-spacing: 0.03em; color: #d7d7f0; }
+.ww-pu-coins { font-size: 12.5px; color: #b9b9dd; }
+.ww-pu-coins b { color: var(--gold); }
+.ww-pu-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ww-pu {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+  background: var(--ink-2); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px; padding: 11px 9px; cursor: pointer; color: #fff;
+  transition: transform 0.08s ease, border-color 0.15s ease;
+}
+.ww-pu:active { transform: translateY(1px) scale(0.99); }
+.ww-pu:not(:disabled):hover { border-color: var(--gold); }
+.ww-pu-emoji { font-size: 24px; }
+.ww-pu-name { font-weight: 800; font-size: 14px; }
+.ww-pu-d { font-size: 11px; color: #a3a3ca; line-height: 1.25; }
+.ww-pu-cost {
+  margin-top: 3px; font-weight: 800; font-size: 13px; color: var(--gold);
+  padding: 2px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 16%, var(--ink));
+}
+.ww-pu.poor, .ww-pu:disabled { opacity: 0.5; cursor: default; }
 
 .ww-final-list { display: flex; flex-direction: column; gap: 6px; }
 .ww-finalrow { display: flex; align-items: center; gap: 10px; padding: 7px 8px; background: var(--ink-2); border-radius: 10px; }
