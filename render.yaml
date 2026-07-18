@@ -1,0 +1,17 @@
+# Render Blueprint — free, single instance, WebSocket-friendly.
+# In Render: New + → "Blueprint" → point it at this repo, or create a Web Service
+# manually with the build/start commands below.
+services:
+  - type: web
+    name: spill
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    # IMPORTANT: keep this at a single instance. Rooms live in memory, so more than
+    # one instance would split players across separate game states.
+    numInstances: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+    healthCheckPath: /api/health
