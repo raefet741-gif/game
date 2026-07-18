@@ -1176,6 +1176,37 @@ button.bluff-opt:hover {
   animation: floatUp 2.4s ease-out forwards;
 }
 
+/* inline form error (auth gate) */
+.form-err {
+  color: #ffd5d9;
+  background: rgba(251, 90, 106, 0.14);
+  border: 1px solid rgba(251, 90, 106, 0.4);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* back-to-home link shown on game pages */
+.home-back {
+  position: fixed;
+  top: 12px;
+  inset-inline-start: 12px;
+  z-index: 30;
+  background: rgba(13, 13, 34, 0.6);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 13px;
+  border-radius: var(--r-pill);
+  backdrop-filter: blur(6px);
+}
+.home-back:hover {
+  background: rgba(240, 238, 255, 0.12);
+}
+
 /* ---------- misc ---------- */
 .divider {
   height: 1px;

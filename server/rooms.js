@@ -12,6 +12,7 @@ import {
   ALL_CATEGORIES,
 } from "./questions.js";
 import { getPower } from "./powers.js";
+import { awardGameResults } from "./accounts.js";
 
 let ioRef = null;
 export function attachIO(io) {
@@ -45,7 +46,7 @@ function defaultSettings() {
     categories,
     spice: "bold", // 'clean' | 'medium' | 'bold' (max intensity shown)
     powersEnabled: true,
-    startingCoins: 5, // coins each player starts with (Power Shop currency)
+    startingXp: 5, // XP each player starts with (earned in rounds, spent in the shop, decides the winner)
     maxPlayers: 12,
     allowCustom: true,
     chickenPenalty: 1,
@@ -150,10 +151,10 @@ class Room {
       id: randId(),
       name: clean,
       color: chosen,
-      score: 0, // points = leaderboard / win condition
-      coins: this.settings.startingCoins, // coins = Power Shop currency
+      score: this.settings.startingXp, // XP: earned in rounds, decides the winner, spent in the shop
       connected: true,
       socketId: null,
+      userId: null, // linked account, if the player is logged in
       powers: [], // active powers owned but not yet fired
       shielded: false,
       mirrored: false,
@@ -202,7 +203,7 @@ class Room {
     if ("spice" in patch && ["clean", "medium", "bold"].includes(patch.spice))
       s.spice = patch.spice;
     if ("powersEnabled" in patch) s.powersEnabled = !!patch.powersEnabled;
-    if ("startingCoins" in patch) s.startingCoins = clampInt(patch.startingCoins, 0, 50);
+    if ("startingXp" in patch) s.startingXp = clampInt(patch.startingXp, 0, 50);
     if ("maxPlayers" in patch) s.maxPlayers = clampInt(patch.maxPlayers, 2, 16);
     if ("allowCustom" in patch) s.allowCustom = !!patch.allowCustom;
     if ("chickenPenalty" in patch) s.chickenPenalty = clampInt(patch.chickenPenalty, 0, 10);
@@ -211,9 +212,9 @@ class Room {
         if (k in s.categories) s.categories[k] = !!v;
       }
     }
-    // Keep lobby coin balances in sync with a changed starting-coins setting.
-    if (this.status === "lobby" && "startingCoins" in patch) {
-      for (const p of this.players) p.coins = s.startingCoins;
+    // Keep lobby XP in sync with a changed starting-XP setting.
+    if (this.status === "lobby" && "startingXp" in patch) {
+      for (const p of this.players) p.score = s.startingXp;
     }
   }
 
@@ -474,7 +475,6 @@ class Room {
       if (opt === realId) {
         correctPids.push(pid);
         pl.score += 1;
-        pl.coins += 1;
       } else {
         fooledPids.push(pid);
       }
@@ -488,10 +488,7 @@ class Room {
       doubled = true;
       this.doubleDown.delete(host.id);
     }
-    if (host) {
-      host.score += hostPoints;
-      host.coins += hostPoints;
-    }
+    if (host) host.score += hostPoints;
     this.bluffResult = {
       realId,
       realText,
@@ -607,7 +604,6 @@ class Room {
         this.doubleDown.delete(player.id);
       }
       player.score += base;
-      player.coins += base; // winning a round also fills your coin wallet
       points = base;
       this.pushLog("scored", { name: player.name, type: this.currentType, points: base, doubled });
     } else {
@@ -700,6 +696,23 @@ class Room {
     this.privileges = { mode: null, tasks: [], wish: null };
     const w = this.getPlayer(this.winnerId);
     if (w) this.pushLog("winner", { name: w.name, score: w.score });
+
+    // Award lifetime XP + achievements to any logged-in players.
+    try {
+      const results = awardGameResults(this);
+      for (const r of results) {
+        if (r.socketId && ioRef) {
+          ioRef.to(r.socketId).emit("account_update", {
+            profile: r.profile,
+            gain: r.gain,
+            unlocked: r.unlocked,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("award error:", e);
+    }
+
     this.emitRoom("game_over", { winnerId: this.winnerId });
   }
 
@@ -765,8 +778,7 @@ class Room {
     this.stopTimer();
     this.clearAutoAdvance();
     for (const p of this.players) {
-      p.score = 0;
-      p.coins = this.settings.startingCoins;
+      p.score = this.settings.startingXp;
       p.powers = [];
       p.shielded = false;
       p.mirrored = false;
@@ -788,7 +800,7 @@ class Room {
     const player = this.getPlayer(playerId);
     const power = getPower(powerId);
     if (!player || !power) return { error: "Unknown power." };
-    if (player.coins < power.cost) return { error: "Not enough coins." };
+    if (player.score < power.cost) return { error: "Not enough XP." };
     if (power.id === "shield" && player.shielded)
       return { error: "Your shield is already up." };
     if (power.id === "mirror" && player.mirrored)
@@ -796,7 +808,7 @@ class Room {
     if (power.use === "active" && player.powers.length >= 6)
       return { error: "Your power tray is full." };
 
-    player.coins -= power.cost;
+    player.score -= power.cost;
     if (power.use === "passive") {
       if (power.id === "shield") player.shielded = true;
       if (power.id === "mirror") player.mirrored = true;
@@ -899,10 +911,10 @@ class Room {
           // On a bounce, the roles flip: the caster becomes the victim.
           const victim = def.bounced ? player : target;
           const beneficiary = def.bounced ? target : player;
-          const before = victim.coins;
-          victim.coins = Math.max(0, victim.coins - 1);
-          const moved = before - victim.coins;
-          beneficiary.coins += moved;
+          const before = victim.score;
+          victim.score = Math.max(0, victim.score - 1);
+          const moved = before - victim.score;
+          beneficiary.score += moved;
           this.pushLog("pickpocket", { beneficiary: beneficiary.name, victim: victim.name });
         }
         this.emitRoom("power", { kind: "use", powerId, byId: playerId, targetId: target.id });
@@ -1073,7 +1085,6 @@ class Room {
         name: p.name,
         color: p.color,
         score: p.score,
-        coins: p.coins,
         connected: p.connected,
         isHost: p.id === this.hostId,
         powers: p.powers,

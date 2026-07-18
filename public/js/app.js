@@ -19,6 +19,7 @@ let ui = { drawerOpen: false, drawerTab: "shop", overlay: null, serum: null };
 let drafts = {
   name: "", color: "", joinCode: "", written: "", wish: "", custom: "",
   bluffReal: "", bluffFake1: "", bluffFake2: "",
+  authUser: "", authPass: "",
 };
 let myGuess = null;
 let bumpSet = new Set();
@@ -26,6 +27,11 @@ let prevScores = {};
 let prevPromptId = null;
 let lastFocused = null;
 let hadFirstConnect = false;
+let account = null;
+let authChecked = false;
+let authTab = "login";
+let authBusy = false;
+let authError = "";
 
 const REACTIONS = ["🔥", "😂", "😱", "👏", "💀", "❤️", "🤯", "🙈"];
 
@@ -36,6 +42,20 @@ function loadSession() {
 }
 function saveSession(s) { session = s; localStorage.setItem("spill.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("spill.session"); }
+function accountToken() { return localStorage.getItem("kyuubi.token"); }
+async function apiPost(url, body) {
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    return await r.json();
+  } catch { return { error: "generic" }; }
+}
+function forceLogin() {
+  localStorage.removeItem("kyuubi.token");
+  account = null;
+  authChecked = true;
+  state = null;
+  render();
+}
 
 /* ---------------- helpers ---------------- */
 function esc(str) {
@@ -78,7 +98,7 @@ socket.on("connect", () => {
   const firstLoad = !hadFirstConnect;
   hadFirstConnect = true;
   if (session?.code && session?.playerId) {
-    socket.emit("join_room", { code: session.code, playerId: session.playerId }, (res) => {
+    socket.emit("join_room", { code: session.code, playerId: session.playerId, token: accountToken() }, (res) => {
       if (!res?.ok) { clearSession(); state = null; render(); return; }
       // On a fresh page load, don't get stuck in an old lobby/finished room — only
       // auto-resume a game that's actually in progress, so reopening the app lets you
@@ -104,6 +124,10 @@ socket.on("power", ({ kind, powerId }) => {
   if (kind === "use" && powerId === "pickpocket") sfx.steal(); else sfx.power();
 });
 socket.on("game_over", () => { confettiBurst(); sfx.win(); });
+socket.on("account_update", ({ gain, unlocked }) => {
+  if (gain) toast(t("xp_earned", { n: gain }), "ok");
+  if (unlocked && unlocked.length) setTimeout(() => toast(t("achv_unlocked", { n: unlocked.length }), "ok"), 900);
+});
 socket.on("reaction", ({ emoji, byColor }) => floatEmoji(emoji, byColor));
 socket.on("serum", ({ answer, ofName, bluff }) => {
   ui.serum = { answer, ofName, bluff };
@@ -142,7 +166,7 @@ function applyState(next) {
 function render() {
   captureFocus();
   let html = "";
-  if (!state) html = viewPre();
+  if (!state) html = !authChecked ? viewLoading() : account ? viewPre() : viewAuthGate();
   else if (state.status === "lobby") html = viewLobby();
   else if (state.status === "playing") html = viewPlaying();
   else if (state.status === "finished") html = viewFinished();
@@ -170,6 +194,55 @@ function colorSwatches() {
   return `<div class="swatches">${(config.colors || [])
     .map((c) => `<button type="button" class="swatch ${drafts.color === c ? "sel" : ""}" style="background:${c}" data-action="pick-color" data-color="${c}"></button>`)
     .join("")}</div>`;
+}
+
+function viewLoading() {
+  return `<div class="screen center-screen"><div class="brand" style="font-size:52px">KYUUBI</div><p class="muted">…</p></div>`;
+}
+function viewAuthGate() {
+  const isLogin = authTab === "login";
+  return `<div class="screen center-screen">
+    ${langBar()}
+    <div class="panel form-card stack" style="margin-top:12px">
+      <div class="brand" style="font-size:40px;text-align:center">KYUUBI</div>
+      <h2 class="display" style="text-align:center;font-size:26px">${t("gate_title")}</h2>
+      <p class="muted" style="text-align:center">${t("gate_sub")}</p>
+      <div class="seg" style="align-self:center">
+        <button class="${isLogin ? "on" : ""}" data-action="auth-tab" data-tab="login">${t("acc_login")}</button>
+        <button class="${!isLogin ? "on" : ""}" data-action="auth-tab" data-tab="register">${t("acc_signup")}</button>
+      </div>
+      <label class="field">${t("acc_username")}
+        <input class="input" id="gate-user" data-draft="authUser" maxlength="20" autocomplete="username" value="${esc(drafts.authUser)}" /></label>
+      <label class="field">${t("acc_password")}
+        <input class="input" id="gate-pass" type="password" data-draft="authPass" maxlength="64" autocomplete="${isLogin ? "current-password" : "new-password"}" value="${esc(drafts.authPass)}" /></label>
+      ${authError ? `<div class="form-err">${esc(authError)}</div>` : ""}
+      <button class="btn ${isLogin ? "btn-cyan" : "btn-pink"} block lg" data-action="${isLogin ? "gate-login" : "gate-register"}" ${authBusy ? "disabled" : ""}>${authBusy ? "…" : isLogin ? t("acc_login_cta") : t("acc_signup_cta")}</button>
+    </div>
+  </div>`;
+}
+function gateErr(code) {
+  const map = { name_taken: "acc_err_name_taken", bad_username: "acc_err_bad_username", bad_password: "acc_err_bad_password", bad_login: "acc_err_bad_login" };
+  return t(map[code] || "acc_err_generic");
+}
+async function doGateAuth(kind) {
+  const u = (document.getElementById("gate-user")?.value || "").trim();
+  const p = document.getElementById("gate-pass")?.value || "";
+  drafts.authUser = u; drafts.authPass = p;
+  if (!u || !p) { authError = t("acc_err_fill"); render(); return; }
+  authBusy = true; authError = ""; render();
+  const res = kind === "login" ? await apiPost("/api/login", { username: u, password: p }) : await apiPost("/api/register", { username: u, password: p });
+  authBusy = false;
+  if (res && res.ok) {
+    localStorage.setItem("kyuubi.token", res.token);
+    account = res.profile;
+    if (!drafts.name) drafts.name = account.name;
+    if (account.color) drafts.color = account.color;
+    drafts.authUser = ""; drafts.authPass = ""; authError = "";
+    render();
+  } else {
+    authError = gateErr(res && res.error);
+    render();
+  }
 }
 
 function viewPre() {
@@ -229,7 +302,7 @@ function viewLobby() {
   const iAmHost = me && state.hostId === me.id;
   const connected = state.players.filter((p) => p.connected).length;
   const base = inviteBase();
-  const joinUrl = `${base}/?room=${state.code}`;
+  const joinUrl = `${base}/spill?room=${state.code}`;
   const s = state.settings;
 
   const playerRows = state.players
@@ -288,8 +361,8 @@ function viewLobby() {
         </div>
         <div class="setting"><span class="label">${t("superpowers")}</span>
           <label class="toggle"><input type="checkbox" data-change="powersEnabled" ${s.powersEnabled ? "checked" : ""} /><span class="track"></span><span>${t("powers_enabled")}</span></label>
-          <span class="label" style="margin-top:6px">${t("starting_coins")}</span>
-          ${seg("startingCoins", [{ val: 0, label: "0" }, { val: 5, label: "5" }, { val: 10, label: "10" }], s.startingCoins)}
+          <span class="label" style="margin-top:6px">${t("starting_xp")}</span>
+          ${seg("startingXp", [{ val: 0, label: "0" }, { val: 5, label: "5" }, { val: 10, label: "10" }], s.startingXp)}
         </div>
         <div class="setting"><span class="label">${t("chicken_penalty")}</span>
           ${seg("chickenPenalty", [{ val: 0, label: "0" }, { val: 1, label: "1" }, { val: 2, label: "2" }, { val: 3, label: "3" }], s.chickenPenalty)}
@@ -354,7 +427,7 @@ function scoreboardHTML() {
         ${avatarHTML(p)}
         <div class="name">${esc(p.name)} ${p.id === myId() ? `<span class="badge-you">${t("you_badge")}</span>` : ""}</div>
         <div class="score ${bumpSet.has(p.id) ? "bump" : ""}">${p.score}</div>
-        ${state.settings.powersEnabled ? `<div class="coins">🪙 ${p.coins}</div>` : ""}
+        <div class="coins">${t("xp_unit")}</div>
         <div class="mini-powers">${icons}</div>
       </div>`;
     })
@@ -399,7 +472,6 @@ function viewPlaying() {
   const iAmResp = me && state.respondingPlayerId === me.id;
   const iAmHost = me && state.hostId === me.id;
   const phase = state.turnPhase;
-  const coins = me ? me.coins : 0;
   const rname = esc(resp?.name || "");
 
   const top = `<div class="topbar">
@@ -409,7 +481,7 @@ function viewPlaying() {
     <span class="chip">🎴 ${state.deck.truth}${tLetter("truth")}·${state.deck.dare}${tLetter("dare")}</span>
     <span class="grow"></span>
     ${langCycleBtn()}
-    ${state.settings.powersEnabled ? `<button class="btn btn-violet sm" data-action="open-drawer">🪙 ${coins}</button>` : ""}
+    ${state.settings.powersEnabled ? `<button class="btn btn-violet sm" data-action="open-drawer">🛒 ${t("shop")}</button>` : ""}
     <button class="btn btn-ghost sm" data-action="toggle-mute">${sfx.muted ? "🔇" : "🔊"}</button>
     <button class="btn btn-ghost sm" data-action="leave">⋯</button>
   </div>`;
@@ -592,11 +664,11 @@ function feedHTML() {
 /* ---------------- DRAWER ---------------- */
 function viewDrawer() {
   const me = myPlayer();
-  const coins = me ? me.coins : 0;
+  const xp = me ? me.score : 0;
   const shop = config.powers.map((pw) => {
     const meta = tPower(pw.id);
     const armed = (pw.id === "shield" && me?.shielded) || (pw.id === "mirror" && me?.mirrored);
-    const disabled = coins < pw.cost || armed;
+    const disabled = xp < pw.cost || armed;
     return `<div class="power-card">
       <div class="row spread"><span class="picon">${pw.icon}</span><span class="cost">${pw.cost}</span></div>
       <div class="pname">${esc(meta.name)}</div>
@@ -633,7 +705,7 @@ function viewDrawer() {
           <button class="${ui.drawerTab === "shop" ? "on" : ""}" data-action="drawer-tab" data-tab="shop">${t("shop_tab")}</button>
           <button class="${ui.drawerTab === "tray" ? "on" : ""}" data-action="drawer-tab" data-tab="tray">${t("powers_tab")}</button>
         </div>
-        <div class="row"><span class="chip">🪙 ${t("coins_n", { n: coins })}</span><button class="btn btn-ghost sm" data-action="close-drawer">✕</button></div>
+        <div class="row"><span class="chip">⚡ ${t("xp_n", { n: xp })}</span><button class="btn btn-ghost sm" data-action="close-drawer">✕</button></div>
       </div>
       ${body}
     </div>
@@ -787,6 +859,9 @@ $app.addEventListener("focusin", (e) => { if (e.target.id) lastFocused = e.targe
 
 function onAction(action, el) {
   switch (action) {
+    case "auth-tab": authTab = el.dataset.tab; authError = ""; render(); break;
+    case "gate-login": doGateAuth("login"); break;
+    case "gate-register": doGateAuth("register"); break;
     case "set-lang":
       setLang(el.dataset.lang);
       render();
@@ -803,16 +878,18 @@ function onAction(action, el) {
     case "goto-landing": pre = "landing"; render(); break;
     case "pick-color": drafts.color = el.dataset.color; render(); break;
     case "create-room":
-      socket.emit("create_room", { name: drafts.name, color: drafts.color }, (res) => {
+      socket.emit("create_room", { name: drafts.name, color: drafts.color, token: accountToken() }, (res) => {
         if (res?.ok) { saveSession({ code: res.code, playerId: res.playerId }); applyState(res.state); }
+        else if (res?.error === "login_required") { toast(t("login_required"), "error"); forceLogin(); }
         else toast(tErr(res?.error || "Could not create room."), "error");
       });
       break;
     case "join-room":
       if (!drafts.joinCode.trim()) return toast(t("enter_code"), "error");
       if (!drafts.name.trim()) return toast(t("enter_name"), "error");
-      socket.emit("join_room", { code: drafts.joinCode, name: drafts.name, color: drafts.color }, (res) => {
+      socket.emit("join_room", { code: drafts.joinCode, name: drafts.name, color: drafts.color, token: accountToken() }, (res) => {
         if (res?.ok) { saveSession({ code: res.code, playerId: res.playerId }); applyState(res.state); }
+        else if (res?.error === "login_required") { toast(t("login_required"), "error"); forceLogin(); }
         else toast(tErr(res?.error || "Could not join."), "error");
       });
       break;
@@ -823,7 +900,7 @@ function onAction(action, el) {
         socket.emit("update_settings", { categories: { [cat]: !state.settings.categories[cat] } });
       } else {
         let val = el.dataset.val;
-        if (["turnTimer", "winValue", "startingCoins", "chickenPenalty", "maxPlayers"].includes(key)) val = Number(val);
+        if (["turnTimer", "winValue", "startingXp", "chickenPenalty", "maxPlayers"].includes(key)) val = Number(val);
         socket.emit("update_settings", { [key]: val });
       }
       sfx.click();
@@ -987,4 +1064,25 @@ function postRender() {
     pre = "join";
   }
   render();
+  // Require login: check the session, then reveal the game or the login wall.
+  const tok = accountToken();
+  if (!tok) {
+    authChecked = true;
+    if (!state) render();
+  } else {
+    fetch("/api/me", { headers: { Authorization: "Bearer " + tok } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.profile) {
+          account = d.profile;
+          if (!drafts.name) drafts.name = account.name;
+          if (account.color) drafts.color = account.color;
+        } else {
+          localStorage.removeItem("kyuubi.token");
+        }
+        authChecked = true;
+        if (!state) render();
+      })
+      .catch(() => { authChecked = true; if (!state) render(); });
+  }
 })();

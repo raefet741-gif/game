@@ -18,8 +18,20 @@ import {
   sweepRooms,
   AVATAR_COLORS,
 } from "./rooms.js";
+import { attachMemoryIO, sweepMemoryRooms } from "./memory.js";
 import { POWERS } from "./powers.js";
 import { CATEGORY_LABELS } from "./questions.js";
+import { loadStore } from "./store.js";
+import {
+  register,
+  login,
+  logout,
+  profileFromToken,
+  userFromToken,
+  ACHIEVEMENTS,
+} from "./accounts.js";
+
+loadStore();
 
 let QRCode = null;
 try {
@@ -49,8 +61,36 @@ const SERVER_URL = `http://${LAN_IP}:${PORT}`;
 
 const app = express();
 app.disable("x-powered-by");
+app.use(express.json({ limit: "8kb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+// ---- accounts (REST) ----
+function bearer(req) {
+  const h = req.headers.authorization || "";
+  if (h.startsWith("Bearer ")) return h.slice(7);
+  return req.query.token || null;
+}
+app.post("/api/register", (req, res) => {
+  const { username, password } = req.body || {};
+  const r = register(username, password);
+  res.status(r.error ? 400 : 200).json(r);
+});
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body || {};
+  const r = login(username, password);
+  res.status(r.error ? 401 : 200).json(r);
+});
+app.post("/api/logout", (req, res) => {
+  logout(bearer(req));
+  res.json({ ok: true });
+});
+app.get("/api/me", (req, res) => {
+  const profile = profileFromToken(bearer(req));
+  if (!profile) return res.status(401).json({ error: "no_session" });
+  res.json({ ok: true, profile });
+});
+app.get("/api/achievements", (_req, res) => res.json({ achievements: ACHIEVEMENTS }));
 
 // QR image for a given text (used by the client to render a scannable join code).
 app.get("/api/qr", async (req, res) => {
@@ -68,7 +108,12 @@ app.get("/api/qr", async (req, res) => {
   }
 });
 
+// Game pages (clean URLs → their HTML shells).
+app.get(["/spill", "/spill/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "spill.html")));
+app.get(["/memory", "/memory/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "memory.html")));
+
 app.use(express.static(PUBLIC_DIR));
+// Everything else falls back to the arcade home.
 app.get("*", (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "index.html")));
 
 const server = http.createServer(app);
@@ -76,6 +121,7 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 attachIO(io);
+attachMemoryIO(io, SERVER_URL);
 
 // ---- helpers ----
 function ctx(socket) {
@@ -115,6 +161,15 @@ function handle(socket, fn) {
   }
 }
 
+// Link a socket/player to a logged-in account (optional — guests can still play).
+function linkAccount(socket, player, token) {
+  const user = userFromToken(token);
+  if (user) {
+    player.userId = user.id;
+    socket.data.userId = user.id;
+  }
+}
+
 io.on("connection", (socket) => {
   socket.emit("config", {
     powers: POWERS,
@@ -126,8 +181,10 @@ io.on("connection", (socket) => {
   // ---- room entry ----
   socket.on("create_room", (payload = {}, cb) => {
     try {
+      if (!userFromToken(payload.token)) return ack(cb, { error: "login_required" });
       const { room, player } = createRoom(payload.name, payload.color);
       bindPlayerToRoom(socket, room, player);
+      linkAccount(socket, player, payload.token);
       ack(cb, { ok: true, code: room.code, playerId: player.id, state: room.toState() });
       room.broadcast();
     } catch (err) {
@@ -138,6 +195,7 @@ io.on("connection", (socket) => {
 
   socket.on("join_room", (payload = {}, cb) => {
     try {
+      if (!userFromToken(payload.token)) return ack(cb, { error: "login_required" });
       const room = getRoom(payload.code);
       if (!room) return ack(cb, { error: "No room with that code." });
 
@@ -146,6 +204,7 @@ io.on("connection", (socket) => {
         const existing = room.getPlayer(payload.playerId);
         if (existing) {
           bindPlayerToRoom(socket, room, existing);
+          linkAccount(socket, existing, payload.token);
           ack(cb, { ok: true, code: room.code, playerId: existing.id, state: room.toState() });
           room.broadcast();
           return;
@@ -159,6 +218,7 @@ io.on("connection", (socket) => {
 
       const player = room.addPlayer(payload.name, payload.color);
       bindPlayerToRoom(socket, room, player);
+      linkAccount(socket, player, payload.token);
       ack(cb, { ok: true, code: room.code, playerId: player.id, state: room.toState() });
       room.pushLog("joined", { name: player.name });
       room.broadcast();
@@ -316,7 +376,10 @@ io.on("connection", (socket) => {
 });
 
 // Periodic cleanup of abandoned rooms.
-setInterval(sweepRooms, 60 * 1000);
+setInterval(() => {
+  sweepRooms();
+  sweepMemoryRooms();
+}, 60 * 1000);
 
 server.listen(PORT, "0.0.0.0", () => {
   const line = "─".repeat(52);

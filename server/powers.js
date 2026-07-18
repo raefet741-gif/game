@@ -39,7 +39,7 @@ export const POWERS = [
     name: "Pickpocket",
     icon: "🕵️",
     cost: 5,
-    blurb: "Steal 1 coin from any player you choose.",
+    blurb: "Steal 1 XP from any player you choose.",
     use: "active",
     target: "player",
     offensive: true,

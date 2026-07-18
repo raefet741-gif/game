@@ -1,4 +1,6 @@
 node_modules/
+# local account database (use a hosted DB in production)
+server/data/
 npm-debug.log*
 *.log
 .DS_Store
