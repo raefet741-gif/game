@@ -38,6 +38,12 @@ const T = {
     spill_tag: "Truth or dare with XP, superpowers & a two-lies-and-a-truth bluff mode.",
     memory_name: "MEMORY MATCH",
     memory_tag: "Flip cards to find pairs. Race in teams across growing grids — the team that wins the most rounds takes the crown.",
+    sudoku_name: "SUDOKU RACE",
+    sudoku_tag: "Team vs team on the same puzzle — 1v1, 2v2, 3v3 or more. First team to fill the grid wins the coins & XP.",
+    puzzle_name: "PICTURE PUZZLE",
+    puzzle_tag: "Drag the pieces to rebuild the picture. Solo or race friends — or turn a selfie into an AI puzzle.",
+    words_name: "WORD WONDERS",
+    words_tag: "Swipe the letter wheel to spell words and fill the crossword. Play solo, versus, or in teams — first to finish wins.",
     headsup_name: "HEADS UP",
     headsup_tag: "Guess what's on your card while the room gives you clues. Your own photo packs, coming next.",
     more: "More games coming",
@@ -46,11 +52,19 @@ const T = {
     account: "Account", login: "Log in", sign_up: "Sign up", log_in: "Log in", logout: "Log out",
     username: "Username", password: "Password",
     login_cta: "Log in", signup_cta: "Create account",
-    profile: "Profile", lvl: "LVL", level: "Level {n}",
+    profile: "Profile", lvl: "LVL", level: "Level {n}", coins: "Coins",
     games_played: "Games", wins: "Wins", crowd: "Biggest room",
     achievements: "Achievements",
     guest_hint: "Log in to save your XP & achievements",
     login_to_play: "Log in to play",
+    leaderboard: "Leaderboard",
+    lb_empty: "No players yet — be the first!",
+    lb_versus: "Versus",
+    lb_solo: "Solo",
+    lb_versus_sub: "Ranked by XP won against other players",
+    lb_solo_sub: "Ranked by XP from playing alone",
+    lb_wins: "wins",
+    lb_solved: "solved",
     close: "Close",
     err_fill: "Enter a username and password.",
     err_name_taken: "That username is taken.",
@@ -66,6 +80,12 @@ const T = {
     spill_tag: "Action ou vérité avec XP, super-pouvoirs et un mode bluff « deux mensonges et une vérité ».",
     memory_name: "MEMORY MATCH",
     memory_tag: "Retourne les cartes pour trouver les paires. Course en équipes sur des grilles de plus en plus grandes — l'équipe qui gagne le plus de manches est sacrée.",
+    sudoku_name: "SUDOKU RACE",
+    sudoku_tag: "Équipe contre équipe sur la même grille — 1c1, 2c2, 3c3 ou plus. La première équipe à remplir la grille rafle les pièces et l'XP.",
+    puzzle_name: "PUZZLE PHOTO",
+    puzzle_tag: "Glisse les pièces pour reconstruire l'image. Solo ou contre tes amis — ou transforme un selfie en puzzle IA.",
+    words_name: "WORD WONDERS",
+    words_tag: "Glisse sur la roue de lettres pour former des mots et remplir la grille. Solo, versus ou en équipes — le premier à finir gagne.",
     headsup_name: "DEVINE",
     headsup_tag: "Devine ce que tu as pendant que la salle te donne des indices. Tes propres packs photos, bientôt.",
     more: "D'autres jeux arrivent",
@@ -73,11 +93,19 @@ const T = {
     account: "Compte", login: "Se connecter", sign_up: "S'inscrire", log_in: "Connexion", logout: "Déconnexion",
     username: "Nom d'utilisateur", password: "Mot de passe",
     login_cta: "Se connecter", signup_cta: "Créer le compte",
-    profile: "Profil", lvl: "NIV", level: "Niveau {n}",
+    profile: "Profil", lvl: "NIV", level: "Niveau {n}", coins: "Pièces",
     games_played: "Parties", wins: "Victoires", crowd: "Plus grande salle",
     achievements: "Succès",
     guest_hint: "Connecte-toi pour sauvegarder ton XP et tes succès",
     login_to_play: "Connecte-toi pour jouer",
+    leaderboard: "Classement",
+    lb_empty: "Aucun joueur pour l'instant — sois le premier !",
+    lb_versus: "Versus",
+    lb_solo: "Solo",
+    lb_versus_sub: "Classé par XP gagné contre d'autres joueurs",
+    lb_solo_sub: "Classé par XP en jouant seul",
+    lb_wins: "victoires",
+    lb_solved: "résolus",
     close: "Fermer",
     err_fill: "Entre un nom et un mot de passe.",
     err_name_taken: "Ce nom est déjà pris.",
@@ -93,6 +121,12 @@ const T = {
     spill_tag: "صراحة أو تحدٍّ مع نقاط خبرة وقوى خارقة ووضع خداع «كذبتان وحقيقة».",
     memory_name: "لعبة الذاكرة",
     memory_tag: "اقلب البطاقات لإيجاد الأزواج. تسابقوا في فرق عبر شبكات تكبر تدريجيًا — الفريق الأكثر فوزًا بالجولات يتوّج بطلًا.",
+    sudoku_name: "سباق سودوكو",
+    sudoku_tag: "فريق ضد فريق على اللغز نفسه — 1ضد1 أو 2ضد2 أو 3ضد3 أو أكثر. أول فريق يُكمل الشبكة يربح العملات والخبرة.",
+    puzzle_name: "أحجية الصور",
+    puzzle_tag: "اسحب القطع لإعادة تركيب الصورة. منفردًا أو ضد أصدقائك — أو حوّل سيلفي إلى أحجية بالذكاء الاصطناعي.",
+    words_name: "عجائب الكلمات",
+    words_tag: "اسحب على عجلة الحروف لتكوين الكلمات وملء الشبكة. فردي أو تنافسي أو بالفرق — أول من ينهي يفوز.",
     headsup_name: "خمّن",
     headsup_tag: "خمّن ما على بطاقتك بينما تعطيك الغرفة تلميحات. حزم صورك الخاصة قريبًا.",
     more: "المزيد من الألعاب قريبًا",
@@ -100,11 +134,19 @@ const T = {
     account: "الحساب", login: "تسجيل الدخول", sign_up: "إنشاء حساب", log_in: "تسجيل الدخول", logout: "تسجيل الخروج",
     username: "اسم المستخدم", password: "كلمة المرور",
     login_cta: "دخول", signup_cta: "إنشاء الحساب",
-    profile: "الملف الشخصي", lvl: "مستوى", level: "المستوى {n}",
+    profile: "الملف الشخصي", lvl: "مستوى", level: "المستوى {n}", coins: "عملات",
     games_played: "الألعاب", wins: "الانتصارات", crowd: "أكبر غرفة",
     achievements: "الإنجازات",
     guest_hint: "سجّل الدخول لحفظ نقاط خبرتك وإنجازاتك",
     login_to_play: "سجّل الدخول للعب",
+    leaderboard: "المتصدّرون",
+    lb_empty: "لا لاعبين بعد — كن الأول!",
+    lb_versus: "تنافسي",
+    lb_solo: "منفرد",
+    lb_versus_sub: "مرتّب حسب الخبرة المكتسبة ضد اللاعبين الآخرين",
+    lb_solo_sub: "مرتّب حسب الخبرة من اللعب منفردًا",
+    lb_wins: "انتصارات",
+    lb_solved: "مكتملة",
     close: "إغلاق",
     err_fill: "أدخل اسم المستخدم وكلمة المرور.",
     err_name_taken: "اسم المستخدم مأخوذ.",
@@ -178,7 +220,9 @@ function initial(name) {
 
 /* ---------------- account state + API ---------------- */
 let account = null;
-let modalKind = null; // 'auth' | 'profile' | null
+let modalKind = null; // 'auth' | 'profile' | 'leaderboard' | null
+let lbData = null;
+let lbMode = "versus"; // 'versus' (against others) | 'solo' (alone)
 let authTab = "login";
 let authBusy = false;
 let authError = "";
@@ -224,10 +268,57 @@ function accountChip() {
   }
   return `<button class="btn btn-cyan sm" data-act="open-auth">👤 ${t("login")}</button>`;
 }
+function lbButton() {
+  return `<button class="btn btn-ghost sm" data-act="open-leaderboard" title="${t("leaderboard")}">🏆</button>`;
+}
+async function fetchLeaderboard() {
+  const forMode = lbMode;
+  try {
+    const r = await fetch("/api/leaderboard?mode=" + encodeURIComponent(forMode));
+    const players = (await r.json()).players || [];
+    if (lbMode === forMode) lbData = players; // ignore a stale response after a tab switch
+  } catch {
+    if (lbMode === forMode) lbData = [];
+  }
+  if (modalKind === "leaderboard") render();
+}
+function leaderboardModal() {
+  const isSolo = lbMode === "solo";
+  const tabs = `<div class="tabs" style="justify-content:center;margin-bottom:6px">
+    <button class="${!isSolo ? "on" : ""}" data-act="lb-tab" data-mode="versus">⚔️ ${t("lb_versus")}</button>
+    <button class="${isSolo ? "on" : ""}" data-act="lb-tab" data-mode="solo">🧍 ${t("lb_solo")}</button>
+  </div>
+  <div class="count-hint" style="text-align:center;margin-bottom:10px">${isSolo ? t("lb_solo_sub") : t("lb_versus_sub")}</div>`;
+
+  let list;
+  if (!lbData) list = `<p class="muted" style="text-align:center;padding:16px">…</p>`;
+  else if (!lbData.length) list = `<div class="empty-note">${t("lb_empty")}</div>`;
+  else
+    list = `<div class="gl-list">${lbData
+      .map((p, i) => {
+        const medal = ["🥇", "🥈", "🥉"][i] || `#${p.rank}`;
+        const mine = account && account.name === p.name;
+        const sub = isSolo
+          ? `${p.gamesPlayed} ${t("lb_solved")}`
+          : `${p.wins} ${t("lb_wins")}`;
+        return `<div class="gl-row ${mine ? "me" : ""}">
+        <span class="gl-rank">${medal}</span>
+        <span class="avatar sm" style="background:${esc(p.color)}">${esc(initial(p.name))}</span>
+        <span class="gl-name">${esc(p.name)}</span>
+        <span class="gl-lvl">${sub}</span>
+        <span class="gl-xp">${p.xp} XP</span>
+      </div>`;
+      })
+      .join("")}</div>`;
+  return modal(tabs + list, "🏆 " + t("leaderboard"));
+}
 
 const GAMES = [
   { id: "spill", href: "/spill", emoji: "🍸", accent: "var(--pink)", name: () => "SPILL", tag: () => t("spill_tag"), pill: { en: "Truth or Dare", fr: "Action/Vérité", ar: "صراحة/تحدٍّ" }, ready: true },
   { id: "memory", href: "/memory", emoji: "🎴", accent: "var(--cyan)", name: () => t("memory_name"), tag: () => t("memory_tag"), pill: { en: "Team memory", fr: "Mémoire en équipe", ar: "ذاكرة جماعية" }, ready: true },
+  { id: "sudoku", href: "/sudoku", emoji: "🔢", accent: "var(--green)", name: () => t("sudoku_name"), tag: () => t("sudoku_tag"), pill: { en: "Team vs team", fr: "Équipe vs équipe", ar: "فريق ضد فريق" }, ready: true },
+  { id: "puzzle", href: "/puzzle", emoji: "🧩", accent: "var(--gold)", name: () => t("puzzle_name"), tag: () => t("puzzle_tag"), pill: { en: "Jigsaw · AI", fr: "Puzzle · IA", ar: "أحجية · ذكاء" }, ready: true },
+  { id: "words", href: "/words", emoji: "🔤", accent: "var(--pink)", name: () => t("words_name"), tag: () => t("words_tag"), pill: { en: "Word race", fr: "Course de mots", ar: "سباق الكلمات" }, ready: true },
   { id: "headsup", href: "#", emoji: "🧠", accent: "var(--violet)", name: () => t("headsup_name"), tag: () => t("headsup_tag"), pill: { en: "Guessing", fr: "Devinettes", ar: "تخمين" }, ready: false },
 ];
 function cardHTML(g, i) {
@@ -299,7 +390,7 @@ function profileModal() {
       <div class="avatar xl" style="background:${esc(a.color)}">${esc(initial(a.name))}</div>
       <div>
         <div class="prof-name">${esc(a.name)}</div>
-        <div class="prof-lvl">${t("level", { n: a.level })} · ${a.xp} XP</div>
+        <div class="prof-lvl">${t("level", { n: a.level })} · ${a.xp} XP · 🪙 ${a.coins || 0}</div>
       </div>
     </div>
     <div class="xp-bar"><div class="xp-fill" style="width:${pct}%"></div></div>
@@ -307,7 +398,11 @@ function profileModal() {
     <div class="stat-row">
       <div class="stat-tile"><div class="stat-n">${st.gamesPlayed || 0}</div><div class="stat-l">${t("games_played")}</div></div>
       <div class="stat-tile"><div class="stat-n">${st.wins || 0}</div><div class="stat-l">${t("wins")}</div></div>
-      <div class="stat-tile"><div class="stat-n">${st.biggestRoom || 0}</div><div class="stat-l">${t("crowd")}</div></div>
+      <div class="stat-tile"><div class="stat-n">🪙 ${a.coins || 0}</div><div class="stat-l">${t("coins")}</div></div>
+    </div>
+    <div class="stat-row" style="margin-top:8px">
+      <div class="stat-tile"><div class="stat-n">${(a.modes && a.modes.versus && a.modes.versus.xp) || 0}</div><div class="stat-l">⚔️ ${t("lb_versus")} XP</div></div>
+      <div class="stat-tile"><div class="stat-n">${(a.modes && a.modes.solo && a.modes.solo.xp) || 0}</div><div class="stat-l">🧍 ${t("lb_solo")} XP</div></div>
     </div>
     <div class="games-title" style="font-size:16px;margin:16px 4px 8px">${t("achievements")} · ${(a.achievements || []).length}/${ACH.length}</div>
     <div class="ach-grid">${achs}</div>
@@ -321,12 +416,12 @@ function render() {
   const cards = GAMES.map(cardHTML).join("");
   const placeholder = `<div class="game-card placeholder" style="--accent:var(--violet);animation-delay:${(GAMES.length * 0.12).toFixed(2)}s">
       <div class="gc-emoji">✨</div><div class="gc-tag">${t("more")}</div></div>`;
-  const overlay = modalKind === "auth" ? authModal() : modalKind === "profile" ? profileModal() : "";
+  const overlay = modalKind === "auth" ? authModal() : modalKind === "profile" ? profileModal() : modalKind === "leaderboard" ? leaderboardModal() : "";
 
   $home.innerHTML = `
     <div class="home-top">
       <span class="home-sub">🦊 KYUUBI</span>
-      <div class="top-right">${langBar()}${accountChip()}</div>
+      <div class="top-right">${langBar()}${lbButton()}${accountChip()}</div>
     </div>
     <div class="hero-wrap">
       <div class="kyuubi-mark">🦊</div>
@@ -367,6 +462,12 @@ async function onAct(act, el) {
     case "open-auth":
     case "require-login": modalKind = "auth"; authTab = "login"; authError = ""; render(); focusUser(); break;
     case "open-profile": modalKind = "profile"; render(); break;
+    case "open-leaderboard": modalKind = "leaderboard"; lbMode = "versus"; lbData = null; render(); fetchLeaderboard(); break;
+    case "lb-tab": {
+      const m = el.dataset.mode === "solo" ? "solo" : "versus";
+      if (m !== lbMode) { lbMode = m; lbData = null; render(); fetchLeaderboard(); }
+      break;
+    }
     case "close-modal": modalKind = null; authError = ""; render(); break;
     case "auth-tab": authTab = el.dataset.tab; authError = ""; render(); focusUser(); break;
     case "do-login": await doAuth("login"); break;

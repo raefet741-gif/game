@@ -11,6 +11,9 @@ import { fileURLToPath } from "url";
 import express from "express";
 import { Server } from "socket.io";
 
+import { loadEnv } from "./env.js";
+loadEnv(); // populate process.env from .env before anything reads a key
+
 import {
   attachIO,
   createRoom,
@@ -19,6 +22,15 @@ import {
   AVATAR_COLORS,
 } from "./rooms.js";
 import { attachMemoryIO, sweepMemoryRooms } from "./memory.js";
+import { attachSudokuIO, sweepSudokuRooms } from "./sudoku.js";
+import { attachWordsIO, sweepWordsRooms } from "./words.js";
+import {
+  attachPuzzleIO,
+  sweepPuzzleRooms,
+  generatePuzzleImage,
+  storeCustomImage,
+  getCustomImage,
+} from "./puzzle.js";
 import { POWERS } from "./powers.js";
 import { CATEGORY_LABELS } from "./questions.js";
 import { loadStore } from "./store.js";
@@ -28,6 +40,8 @@ import {
   logout,
   profileFromToken,
   userFromToken,
+  leaderboard,
+  recordSoloWin,
   ACHIEVEMENTS,
 } from "./accounts.js";
 
@@ -61,6 +75,9 @@ const SERVER_URL = `http://${LAN_IP}:${PORT}`;
 
 const app = express();
 app.disable("x-powered-by");
+// Photos/selfies for the puzzle need a big body — parse THIS path large first, so
+// the global 8kb parser below sees the body already read and skips it.
+app.use("/api/puzzle/generate", express.json({ limit: "12mb" }));
 app.use(express.json({ limit: "8kb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -91,6 +108,30 @@ app.get("/api/me", (req, res) => {
   res.json({ ok: true, profile });
 });
 app.get("/api/achievements", (_req, res) => res.json({ achievements: ACHIEVEMENTS }));
+// ?mode=versus (against other people) | solo (alone) | overall (lifetime XP).
+app.get("/api/leaderboard", (req, res) => {
+  const mode = String(req.query.mode || "versus");
+  res.json({ mode, players: leaderboard(mode, 100) });
+});
+
+// A finished client-side SOLO game (e.g. the picture puzzle) claims its reward.
+// The server owns the reward table, so the body only says which game/difficulty.
+// A short per-user cooldown blocks trivial spamming of the endpoint.
+const soloClaimAt = new Map(); // userId -> last claim ms
+app.post("/api/solo/record", (req, res) => {
+  const user = userFromToken(bearer(req));
+  if (!user) return res.status(401).json({ error: "no_session" });
+  const difficulty = String((req.body && req.body.difficulty) || "easy");
+  const now = Date.now();
+  const last = soloClaimAt.get(user.id) || 0;
+  if (now - last < 3000) {
+    return res.json({ ok: true, throttled: true, profile: profileFromToken(bearer(req)) });
+  }
+  soloClaimAt.set(user.id, now);
+  const r = recordSoloWin(user.id, difficulty);
+  if (!r) return res.status(400).json({ error: "no_reward" });
+  res.json({ ok: true, reward: { xp: r.xpGain, coins: r.coinGain }, profile: r.profile });
+});
 
 // QR image for a given text (used by the client to render a scannable join code).
 app.get("/api/qr", async (req, res) => {
@@ -108,9 +149,40 @@ app.get("/api/qr", async (req, res) => {
   }
 });
 
+// ---- puzzle: AI photo → puzzle image + custom image serving ----
+// Big body allowed on THIS route only (selfies/photos); the global cap stays 8kb.
+app.post("/api/puzzle/generate", async (req, res) => {
+  try {
+    const { image, style } = req.body || {};
+    if (!image || typeof image !== "string")
+      return res.status(400).json({ error: "no_image" });
+    // Accept a data URL ("data:image/jpeg;base64,....") or a bare base64 string.
+    const m = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+    const mime = m ? m[1] : "image/jpeg";
+    const b64 = m ? m[2] : image;
+    if (b64.length > 16 * 1024 * 1024)
+      return res.status(413).json({ error: "too_big" });
+    const out = await generatePuzzleImage(b64, mime, style);
+    const stored = storeCustomImage(out.buf, out.mime);
+    res.json({ ok: true, id: stored.id, url: stored.url, ai: !!out.ai, note: out.note || null });
+  } catch (err) {
+    console.error("puzzle generate error:", err);
+    res.status(500).json({ error: "generate_failed" });
+  }
+});
+
+app.get("/api/puzzle/img/:id", (req, res) => {
+  const img = getCustomImage(req.params.id);
+  if (!img) return res.status(404).send("not found");
+  res.type(img.mime).set("Cache-Control", "public, max-age=86400").send(img.buf);
+});
+
 // Game pages (clean URLs → their HTML shells).
 app.get(["/spill", "/spill/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "spill.html")));
 app.get(["/memory", "/memory/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "memory.html")));
+app.get(["/sudoku", "/sudoku/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "sudoku.html")));
+app.get(["/puzzle", "/puzzle/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "puzzle.html")));
+app.get(["/words", "/words/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "words.html")));
 
 app.use(express.static(PUBLIC_DIR));
 // Everything else falls back to the arcade home.
@@ -122,6 +194,9 @@ const io = new Server(server, {
 });
 attachIO(io);
 attachMemoryIO(io, SERVER_URL);
+attachSudokuIO(io, SERVER_URL);
+attachPuzzleIO(io, SERVER_URL);
+attachWordsIO(io, SERVER_URL);
 
 // ---- helpers ----
 function ctx(socket) {
@@ -379,6 +454,9 @@ io.on("connection", (socket) => {
 setInterval(() => {
   sweepRooms();
   sweepMemoryRooms();
+  sweepSudokuRooms();
+  sweepPuzzleRooms();
+  sweepWordsRooms();
 }, 60 * 1000);
 
 server.listen(PORT, "0.0.0.0", () => {

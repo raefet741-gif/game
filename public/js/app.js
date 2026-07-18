@@ -479,6 +479,7 @@ function viewPlaying() {
     <span class="chip code">${state.code}</span>
     <span class="chip">${t("round", { n: state.round })}</span>
     <span class="chip">🎴 ${state.deck.truth}${tLetter("truth")}·${state.deck.dare}${tLetter("dare")}</span>
+    <span class="chip xp-chip">⚡ ${me ? me.score : 0} ${t("xp_unit")}</span>
     <span class="grow"></span>
     ${langCycleBtn()}
     ${state.settings.powersEnabled ? `<button class="btn btn-violet sm" data-action="open-drawer">🛒 ${t("shop")}</button>` : ""}

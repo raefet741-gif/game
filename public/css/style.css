@@ -1176,6 +1176,14 @@ button.bluff-opt:hover {
   animation: floatUp 2.4s ease-out forwards;
 }
 
+/* always-visible XP counter in the game top bar */
+.chip.xp-chip {
+  color: var(--gold);
+  background: rgba(255, 197, 61, 0.12);
+  border-color: rgba(255, 197, 61, 0.38);
+  font-weight: 700;
+}
+
 /* inline form error (auth gate) */
 .form-err {
   color: #ffd5d9;
