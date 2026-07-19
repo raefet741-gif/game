@@ -11,9 +11,14 @@
 // Runs on its own Socket.IO namespace ("/memory") so it never touches SPILL.
 
 import crypto from "crypto";
+import { userFromToken, grantReward } from "./accounts.js";
 
 const rooms = new Map(); // code -> MemoryRoom
 let ioNsp = null;
+
+// Coins + XP handed out once per game (MEMORY is always team-vs-team → versus).
+const REWARD_WIN = { coins: 12, xp: 10 };
+const REWARD_PLAYED = { coins: 4, xp: 3 };
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous 0/O/1/I
 
@@ -125,6 +130,7 @@ class MemoryRoom {
     this.roundWins = {}; // teamIndex -> wins
     this.roundTimeTotals = {}; // teamIndex -> summed winning time (tiebreak)
     this.overallWinnerTeam = null;
+    this.rewarded = false; // guard so a game only pays out once
 
     this.emptySince = null;
   }
@@ -145,6 +151,7 @@ class MemoryRoom {
       team: this.smallestTeam(),
       connected: true,
       socketId: null,
+      userId: null, // set when a logged-in account plays
       joinedAt: Date.now(),
       prog: null, // per-round board progress
     };
@@ -227,6 +234,7 @@ class MemoryRoom {
     this.roundWins = {};
     this.roundTimeTotals = {};
     this.overallWinnerTeam = null;
+    this.rewarded = false;
     this.startRound();
     return { ok: true };
   }
@@ -377,7 +385,37 @@ class MemoryRoom {
       return (this.roundTimeTotals[a] || Infinity) - (this.roundTimeTotals[b] || Infinity);
     });
     this.overallWinnerTeam = ranked.length ? ranked[0] : null;
+    this.awardRewards();
     this.emitRoom("mem_gameover", { winnerTeam: this.overallWinnerTeam });
+  }
+
+  // Grant coins + XP + ranked points to logged-in players, once per game.
+  awardRewards() {
+    if (this.rewarded) return;
+    this.rewarded = true;
+    for (const p of this.players) {
+      if (!p.userId) continue;
+      const won =
+        this.overallWinnerTeam != null && p.team === this.overallWinnerTeam;
+      const r = won ? REWARD_WIN : REWARD_PLAYED;
+      const res = grantReward(p.userId, {
+        coinGain: r.coins,
+        xpGain: r.xp,
+        won,
+        played: true,
+        mode: "versus", // MEMORY is always team-vs-team
+        game: "memory",
+      });
+      if (res && p.socketId && ioNsp) {
+        ioNsp.to(p.socketId).emit("mem_reward", {
+          coins: r.coins,
+          xp: r.xp,
+          won,
+          profile: res.profile,
+          unlocked: res.unlocked,
+        });
+      }
+    }
   }
 
   endByHost(playerId) {
@@ -506,6 +544,12 @@ export function attachMemoryIO(io, serverUrl) {
     player.connected = true;
   }
 
+  // Link a player seat to a logged-in account (optional — guests can still play).
+  function linkAccount(player, token) {
+    const user = userFromToken(token);
+    if (user) player.userId = user.id;
+  }
+
   // Run a mutating handler, surface {error}, then broadcast.
   function handle(socket, fn) {
     try {
@@ -530,6 +574,7 @@ export function attachMemoryIO(io, serverUrl) {
       try {
         const { room, player } = createMemoryRoom(payload.name, payload.color);
         bind(socket, room, player);
+        linkAccount(player, payload.token);
         ack(cb, { ok: true, code: room.code, playerId: player.id, state: room.toState() });
         room.broadcast();
       } catch (err) {
@@ -548,6 +593,7 @@ export function attachMemoryIO(io, serverUrl) {
           const existing = room.getPlayer(payload.playerId);
           if (existing) {
             bind(socket, room, existing);
+            linkAccount(existing, payload.token);
             ack(cb, {
               ok: true,
               code: room.code,
@@ -564,6 +610,7 @@ export function attachMemoryIO(io, serverUrl) {
           return ack(cb, { error: "mem_err_started" });
         const player = room.addPlayer(payload.name, payload.color);
         bind(socket, room, player);
+        linkAccount(player, payload.token);
         ack(cb, { ok: true, code: room.code, playerId: player.id, state: room.toState() });
         room.broadcast();
       } catch (err) {

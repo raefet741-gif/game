@@ -347,6 +347,7 @@ class PuzzleRoom {
         won,
         played: true,
         mode: "versus", // the puzzle race is always against other people
+        game: "puzzle",
       });
       if (r && p.socketId && ioNsp) {
         ioNsp.to(p.socketId).emit("pz_reward", {

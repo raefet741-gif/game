@@ -766,6 +766,8 @@ class WordsRoom {
         xpGain: r.xp,
         won,
         played: true,
+        mode: this.settings.mode === "solo" ? "solo" : "versus",
+        game: "words",
       });
       if (res && p.socketId && ioNsp) {
         ioNsp.to(p.socketId).emit("wow_reward", {

@@ -188,6 +188,9 @@ function unlock(user, id) {
 export function publicProfile(user) {
   if (!user) return null;
   const xp = user.xp || 0;
+  // The competitive rank (Iron → Radiant) is earned ONLY by playing against
+  // other people — solo play grows your level/XP but never your rank.
+  const versusXp = ensureModes(user).versus.xp || 0;
   return {
     id: user.id,
     name: user.name,
@@ -195,7 +198,8 @@ export function publicProfile(user) {
     xp,
     coins: user.coins || 0,
     level: levelFromXp(xp),
-    rank: rankFromXp(xp),
+    rank: rankFromXp(versusXp),
+    rankXp: versusXp,
     intoLevel: xp % XP_PER_LEVEL,
     levelSpan: XP_PER_LEVEL,
     stats: user.stats || { gamesPlayed: 0, wins: 0, biggestRoom: 0 },
@@ -303,7 +307,7 @@ export function leaderboard(mode = "overall", limit = 100) {
       xp: r.xp,
       coins: r.u.coins || 0,
       level: levelFromXp(r.u.xp || 0),
-      rank: rankFromXp(r.u.xp || 0),
+      rank: rankFromXp(ensureModes(r.u).versus.xp || 0), // rank = versus play only
       wins: r.wins,
       gamesPlayed: r.games,
     }));
@@ -333,7 +337,7 @@ export function gameLeaderboard(game, limit = 100) {
       losses: x.b.losses,
       games: x.b.games,
       level: levelFromXp(x.u.xp || 0),
-      tier: rankFromXp(x.u.xp || 0),
+      tier: rankFromXp(ensureModes(x.u).versus.xp || 0), // rank = versus play only
     }));
 }
 

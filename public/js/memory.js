@@ -127,6 +127,7 @@ function loadSession() {
 }
 function saveSession(s) { session = s; localStorage.setItem("memory.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("memory.session"); }
+function accountToken() { return localStorage.getItem("kyuubi.token") || null; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -188,7 +189,7 @@ socket.on("connect", () => {
   const firstLoad = !hadFirstConnect;
   hadFirstConnect = true;
   if (session?.code && session?.playerId) {
-    socket.emit("mem_join", { code: session.code, playerId: session.playerId }, (res) => {
+    socket.emit("mem_join", { code: session.code, playerId: session.playerId, token: accountToken() }, (res) => {
       if (!res?.ok) { clearSession(); state = null; render(); return; }
       if (firstLoad && res.state?.status !== "playing" && res.state?.status !== "roundover") {
         socket.emit("mem_leave");
@@ -237,6 +238,9 @@ socket.on("mem_gameover", ({ winnerTeam }) => {
   confettiBurst();
   sfx.win();
   if (winnerTeam != null && myPlayer()?.team === winnerTeam) confettiBurst();
+});
+socket.on("mem_reward", ({ coins, xp, won }) => {
+  toast(`${won ? "🏆 " : ""}+${coins} 🪙 · +${xp} XP · ${won ? "+18" : "−18"} 🏅`, "ok");
 });
 socket.on("mem_notice", ({ type, message }) =>
   toast(tErr(message), type === "error" ? "error" : "ok")
@@ -289,7 +293,7 @@ function liveTime() {
 function createRoom() {
   const name = (drafts.name || "").trim();
   if (!name) return toast(t("your_name"), "error");
-  socket.emit("mem_create", { name, color: drafts.color }, (res) => {
+  socket.emit("mem_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
     saveSession({ code: res.code, playerId: res.playerId });
     applyState(res.state);
@@ -300,7 +304,7 @@ function joinRoom() {
   const code = (drafts.joinCode || "").trim().toUpperCase();
   if (!name) return toast(t("your_name"), "error");
   if (!code) return toast(t("room_code"), "error");
-  socket.emit("mem_join", { code, name, color: drafts.color }, (res) => {
+  socket.emit("mem_join", { code, name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
     saveSession({ code: res.code, playerId: res.playerId });
     applyState(res.state);

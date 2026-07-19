@@ -887,6 +887,8 @@ class DrawRoom {
         xpGain: r.xp,
         won,
         played: true,
+        mode: this.settings.game === "sketch" && this.settings.mode === "solo" ? "solo" : "versus",
+        game: "draw",
       });
       if (res && p.socketId && ioNsp) {
         ioNsp.to(p.socketId).emit("dd_reward", {

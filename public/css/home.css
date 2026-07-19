@@ -26,23 +26,18 @@
 html[lang="ar"] .home-body { font-family: "Cairo", "Space Grotesk", sans-serif; }
 .home { position: relative; z-index: 1; width: 100%; max-width: none; margin: 0; padding: 0; display: block; }
 
-/* ---------- falling cherry-blossom petals (fixed overlay) ---------- */
-.kz-petals { position: fixed; inset: 0; z-index: 80; pointer-events: none; overflow: hidden; }
-.kz-petal {
-  position: absolute;
-  top: -12vh;
-  border-radius: 70% 0 70% 0;
-  background: linear-gradient(135deg, #e8455a, #b81f2a 72%);
-  box-shadow: 0 1px 4px rgba(150, 20, 30, 0.25);
-  animation-name: kz-fall;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-@keyframes kz-fall {
-  0% { transform: translateY(-12vh) translateX(0) rotate(0deg); opacity: 0; }
-  8% { opacity: 0.95; }
-  92% { opacity: 0.85; }
-  100% { transform: translateY(114vh) translateX(var(--tx, 70px)) rotate(620deg); opacity: 0; }
+/* ---------- falling cherry-blossom petals (JS-driven canvas) ----------
+   Canvas + requestAnimationFrame so the fall plays regardless of the
+   viewer's prefers-reduced-motion setting (a plain CSS animation gets
+   suppressed under reduce on Chromium). */
+.kz-petals {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 80;
+  pointer-events: none;
+  display: block;
 }
 
 /* corner language switch on accueil / auth */
@@ -462,6 +457,18 @@ html[lang="ar"] .kz-game-name { font-family: "Cairo", serif; font-weight: 900; }
 .ach-ic { font-size: 26px; line-height: 1; }
 .ach-nm { font-size: 12px; font-weight: 700; margin-top: 6px; color: #17120f; }
 .ach-ds { font-size: 10px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+
+/* per-game leaderboard tabs — a scrollable row of game emoji */
+.lb-games { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.lb-game {
+  font-size: 20px; line-height: 1; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(26, 21, 18, 0.03); cursor: pointer;
+  transition: transform .1s ease, box-shadow .1s ease, background .1s ease;
+}
+.lb-game:hover { transform: translateY(-1px); }
+.lb-game.on { background: rgba(193, 39, 45, 0.12); border-color: transparent; box-shadow: 0 0 0 2px var(--red); }
 
 .gl-list { display: flex; flex-direction: column; gap: 6px; }
 .gl-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: rgba(26, 21, 18, 0.03); border: 1px solid var(--line); }

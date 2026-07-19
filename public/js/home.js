@@ -69,6 +69,8 @@ const T = {
     lb_solo: "Solo",
     lb_versus_sub: "Ranked by XP won against other players",
     lb_solo_sub: "Ranked by XP from playing alone",
+    lb_points_sub: "Win a match +18 · lose −18 — each game has its own board",
+    lb_pts: "pts",
     lb_wins: "wins",
     lb_solved: "solved",
     close: "Close",
@@ -116,6 +118,8 @@ const T = {
     lb_solo: "Solo",
     lb_versus_sub: "Classé par XP gagné contre d'autres joueurs",
     lb_solo_sub: "Classé par XP en jouant seul",
+    lb_points_sub: "Match gagné +18 · perdu −18 — un classement par jeu",
+    lb_pts: "pts",
     lb_wins: "victoires",
     lb_solved: "résolus",
     close: "Fermer",
@@ -163,6 +167,8 @@ const T = {
     lb_solo: "منفرد",
     lb_versus_sub: "مرتّب حسب الخبرة المكتسبة ضد اللاعبين الآخرين",
     lb_solo_sub: "مرتّب حسب الخبرة من اللعب منفردًا",
+    lb_points_sub: "الفوز ‎+18 · الخسارة ‎−18 — لكل لعبة تصنيفها الخاص",
+    lb_pts: "نقطة",
     lb_wins: "انتصارات",
     lb_solved: "مكتملة",
     close: "إغلاق",
@@ -320,7 +326,7 @@ function initial(name) {
 let account = null;
 let modalKind = null; // 'auth' | 'profile' | 'leaderboard' | null
 let lbData = null;
-let lbMode = "versus"; // 'versus' (against others) | 'solo' (alone)
+let lbGame = "spill"; // which game's own leaderboard is showing
 let authTab = "login";
 let authBusy = false;
 let authError = "";
@@ -370,23 +376,26 @@ function lbButton() {
   return `<button class="btn btn-ghost sm" data-act="open-leaderboard" title="${t("leaderboard")}">🏆</button>`;
 }
 async function fetchLeaderboard() {
-  const forMode = lbMode;
+  const forGame = lbGame;
   try {
-    const r = await fetch("/api/leaderboard?mode=" + encodeURIComponent(forMode));
+    const r = await fetch("/api/leaderboard?game=" + encodeURIComponent(forGame));
     const players = (await r.json()).players || [];
-    if (lbMode === forMode) lbData = players; // ignore a stale response after a tab switch
+    if (lbGame === forGame) lbData = players; // ignore a stale response after a tab switch
   } catch {
-    if (lbMode === forMode) lbData = [];
+    if (lbGame === forGame) lbData = [];
   }
   if (modalKind === "leaderboard") render();
 }
 function leaderboardModal() {
-  const isSolo = lbMode === "solo";
-  const tabs = `<div class="tabs" style="justify-content:center;margin-bottom:6px">
-    <button class="${!isSolo ? "on" : ""}" data-act="lb-tab" data-mode="versus">⚔️ ${t("lb_versus")}</button>
-    <button class="${isSolo ? "on" : ""}" data-act="lb-tab" data-mode="solo">🧍 ${t("lb_solo")}</button>
-  </div>
-  <div class="count-hint" style="text-align:center;margin-bottom:10px">${isSolo ? t("lb_solo_sub") : t("lb_versus_sub")}</div>`;
+  // One tab per game — each game keeps its own ranked board.
+  const games = GAMES.filter((g) => g.ready);
+  const tabs = `<div class="lb-games">${games
+    .map(
+      (g) =>
+        `<button class="lb-game ${g.id === lbGame ? "on" : ""}" data-act="lb-game" data-game="${g.id}" title="${esc(g.name())}">${g.emoji}</button>`
+    )
+    .join("")}</div>
+  <div class="count-hint" style="text-align:center;margin:8px 0 10px">${t("lb_points_sub")}</div>`;
 
   let list;
   if (!lbData) list = `<p class="muted" style="text-align:center;padding:16px">…</p>`;
@@ -394,22 +403,22 @@ function leaderboardModal() {
   else
     list = `<div class="gl-list">${lbData
       .map((p, i) => {
-        const medal = ["🥇", "🥈", "🥉"][i] || `#${p.rank}`;
+        const medal = ["🥇", "🥈", "🥉"][i] || `#${i + 1}`;
         const mine = account && account.name === p.name;
-        const sub = isSolo
-          ? `${p.gamesPlayed} ${t("lb_solved")}`
-          : `${p.wins} ${t("lb_wins")}`;
         return `<div class="gl-row ${mine ? "me" : ""}">
         <span class="gl-rank">${medal}</span>
         <span class="avatar sm" style="background:${esc(p.color)}">${esc(initial(p.name))}</span>
         <span class="gl-name">${esc(p.name)}</span>
-        ${p.rank ? rankBadge(p.rank, "sm") : ""}
-        <span class="gl-lvl">${sub}</span>
-        <span class="gl-xp">${p.xp} XP</span>
+        ${p.tier ? rankBadge(p.tier, "sm") : ""}
+        <span class="gl-lvl">${p.wins}–${p.losses}</span>
+        <span class="gl-xp">${p.points} ${t("lb_pts")}</span>
       </div>`;
       })
       .join("")}</div>`;
-  return modal(tabs + list, "🏆 " + t("leaderboard"));
+
+  const cur = games.find((g) => g.id === lbGame);
+  const title = `🏆 ${cur ? cur.emoji + " " + cur.name() : t("leaderboard")}`;
+  return modal(tabs + list, title);
 }
 
 const GAMES = [
@@ -425,33 +434,6 @@ const GAMES = [
 ];
 /* which of the three KyuubiZ screens is showing: accueil → auth → games */
 let view = "accueil";
-
-// falling cherry-blossom petals — a fixed overlay drawn over every screen (cached).
-// Signature of the KyuubiZ design, so shown even under reduced-motion.
-let _petalCache = null;
-function petalsHTML() {
-  if (!_petalCache) {
-    // two sakura tones so the fall reads clearly over the busy hero art
-    const tones = [
-      "linear-gradient(135deg,#e8455a,#b81f2a 72%)",
-      "linear-gradient(135deg,#ff9db0,#e05a70 72%)",
-    ];
-    let s = "";
-    for (let i = 0; i < 40; i++) {
-      const w = (12 + Math.random() * 12).toFixed(1);
-      const h = (w * (1.1 + Math.random() * 0.3)).toFixed(1);
-      const left = (Math.random() * 100).toFixed(1);
-      const tx = (-160 + Math.random() * 320).toFixed(0);
-      const dur = (8 + Math.random() * 8).toFixed(1);
-      const delay = (-Math.random() * 12).toFixed(1); // negative → some already falling on load
-      const op = (0.6 + Math.random() * 0.4).toFixed(2);
-      const bg = tones[i % tones.length];
-      s += `<span class="kz-petal" style="left:${left}%;width:${w}px;height:${h}px;--tx:${tx}px;background:${bg};animation-duration:${dur}s;animation-delay:${delay}s;opacity:${op}"></span>`;
-    }
-    _petalCache = s;
-  }
-  return `<div class="kz-petals" aria-hidden="true">${_petalCache}</div>`;
-}
 
 const KANJI = "和 · 平和 · 力 · 栄誉";
 
@@ -636,7 +618,7 @@ function render() {
   if (view === "games") body = gamesView();
   else if (view === "auth") body = authView();
   else body = accueilView();
-  $home.innerHTML = petalsHTML() + body + overlayHTML();
+  $home.innerHTML = body + overlayHTML();
 }
 
 function overlayHTML() {
@@ -682,10 +664,10 @@ async function onAct(act, el) {
     case "toggle-auth":
       authTab = authTab === "login" ? "register" : "login"; authError = ""; render(); focusUser(); break;
     case "open-profile": modalKind = "profile"; render(); break;
-    case "open-leaderboard": modalKind = "leaderboard"; lbMode = "versus"; lbData = null; render(); fetchLeaderboard(); break;
-    case "lb-tab": {
-      const m = el.dataset.mode === "solo" ? "solo" : "versus";
-      if (m !== lbMode) { lbMode = m; lbData = null; render(); fetchLeaderboard(); }
+    case "open-leaderboard": modalKind = "leaderboard"; lbGame = "spill"; lbData = null; render(); fetchLeaderboard(); break;
+    case "lb-game": {
+      const g = el.dataset.game;
+      if (g && g !== lbGame) { lbGame = g; lbData = null; render(); fetchLeaderboard(); }
       break;
     }
     case "close-modal": modalKind = null; authError = ""; render(); break;
@@ -736,6 +718,68 @@ async function doLogout() {
   render();
   window.scrollTo(0, 0);
 }
+
+/* ---------------- falling cherry-blossom petals (canvas) ----------------
+   JS/rAF-driven so it plays for everyone, including viewers with
+   prefers-reduced-motion: reduce (which suppresses CSS animations). */
+(function petals() {
+  const canvas = document.getElementById("kzPetals");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const COLORS = ["#ffb7c5", "#ff8fab", "#f06a86", "#e0475f", "#c1272d"];
+  let w, h, dpr, ps;
+  function mk(fromTop) {
+    const size = (7 + Math.random() * 12) * dpr;
+    return {
+      x: Math.random() * w,
+      y: fromTop ? -size * 2 - Math.random() * h * 0.3 : Math.random() * h,
+      size,
+      vy: (0.5 + Math.random() * 1.4) * dpr,
+      sway: (12 + Math.random() * 30) * dpr,
+      swayPhase: Math.random() * Math.PI * 2,
+      swaySpeed: 0.008 + Math.random() * 0.02,
+      rot: Math.random() * Math.PI * 2,
+      vr: -0.03 + Math.random() * 0.06,
+      color: COLORS[(Math.random() * COLORS.length) | 0],
+      alpha: 0.7 + Math.random() * 0.3,
+    };
+  }
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = canvas.width = Math.round(window.innerWidth * dpr);
+    h = canvas.height = Math.round(window.innerHeight * dpr);
+    const n = Math.max(20, Math.min(44, Math.floor(window.innerWidth / 32)));
+    ps = Array.from({ length: n }, () => mk(false));
+  }
+  function petal(p) {
+    const s = p.size;
+    ctx.save();
+    ctx.translate(p.x + Math.sin(p.swayPhase) * p.sway, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.bezierCurveTo(s * 0.62, -s * 0.5, s * 0.62, s * 0.55, 0, s);
+    ctx.bezierCurveTo(-s * 0.62, s * 0.55, -s * 0.62, -s * 0.5, 0, -s);
+    ctx.fill();
+    ctx.restore();
+  }
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    for (const p of ps) {
+      p.y += p.vy;
+      p.swayPhase += p.swaySpeed;
+      p.rot += p.vr;
+      if (p.y - p.size > h) Object.assign(p, mk(true));
+      petal(p);
+    }
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener("resize", resize, { passive: true });
+  resize();
+  requestAnimationFrame(frame);
+})();
 
 /* ---------------- boot ---------------- */
 (async function initAccount() {
