@@ -45,6 +45,8 @@ const T = {
     pick_team: "Tap a team to join it", teams: "Teams", players: "Players",
     settings: "Settings", num_teams: "Number of teams", difficulty: "Difficulty",
     easy: "Easy", medium: "Medium", hard: "Hard",
+    board_size: "Board", size_classic: "Classic 9×9", size_mini: "Mini 6×6",
+    stuck: "Stuck?", use_hint: "Use a hint",
     start_game: "Start game", need_players: "Need at least 2 players.",
     need_teams: "Fill at least 2 teams.", host_only: "Only the host can do that.",
     waiting_host: "Waiting for the host to start…", you: "you", host: "host",
@@ -73,6 +75,8 @@ const T = {
     pick_team: "Touche une équipe pour la rejoindre", teams: "Équipes", players: "Joueurs",
     settings: "Réglages", num_teams: "Nombre d'équipes", difficulty: "Difficulté",
     easy: "Facile", medium: "Moyen", hard: "Difficile",
+    board_size: "Grille", size_classic: "Classique 9×9", size_mini: "Mini 6×6",
+    stuck: "En panne d'inspiration ?", use_hint: "Utiliser un indice",
     start_game: "Démarrer", need_players: "Il faut au moins 2 joueurs.",
     need_teams: "Remplis au moins 2 équipes.", host_only: "Seul l'hôte peut faire ça.",
     waiting_host: "En attente du lancement par l'hôte…", you: "toi", host: "hôte",
@@ -101,6 +105,8 @@ const T = {
     pick_team: "اضغط على فريق للانضمام إليه", teams: "الفرق", players: "اللاعبون",
     settings: "الإعدادات", num_teams: "عدد الفرق", difficulty: "الصعوبة",
     easy: "سهل", medium: "متوسط", hard: "صعب",
+    board_size: "الشبكة", size_classic: "كلاسيكي ٩×٩", size_mini: "ميني ٦×٦",
+    stuck: "عالق؟", use_hint: "استخدم تلميحًا",
     start_game: "ابدأ اللعبة", need_players: "تحتاج لاعبَين على الأقل.",
     need_teams: "املأ فريقين على الأقل.", host_only: "المضيف فقط يمكنه ذلك.",
     waiting_host: "بانتظار أن يبدأ المضيف…", you: "أنت", host: "المضيف",
@@ -146,7 +152,7 @@ let config = { colors: [], serverUrl: "" };
 let state = null;
 let session = loadSession();
 let pre = "landing"; // landing | create | join | solo
-let drafts = { name: "", color: "", joinCode: "", difficulty: "medium" };
+let drafts = { name: "", color: "", joinCode: "", difficulty: "medium", size: "mini" };
 let hadFirstConnect = false;
 
 let grid = new Array(81).fill(0); // MY team's working grid (0 = empty)
@@ -172,6 +178,8 @@ function teamMeta(idx) { return state?.teams.find((tm) => tm.index === idx) || n
 function teamName(idx) { const m = teamMeta(idx); return m ? loc(m.name) : "?"; }
 function teamColor(idx) { const m = teamMeta(idx); return m ? m.color : "#888"; }
 function myTeam() { return myPlayer()?.team ?? null; }
+// Board geometry for the active game (falls back to classic 9×9 before a game).
+function dims() { return state?.dims || { N: 9, boxH: 3, boxW: 3, cells: 81 }; }
 function initials(name) { return (name || "?").trim().charAt(0).toUpperCase() || "?"; }
 function fmtTime(ms) {
   if (ms == null) return t("dnf");
@@ -193,34 +201,35 @@ function toast(message, kind = "ok") {
 
 // Cells that clash with another same-valued cell in their row/col/box.
 function conflictSet() {
+  const { N, boxH, boxW } = dims();
   const bad = new Set();
   const mark = (a, b) => { bad.add(a); bad.add(b); };
-  for (let r = 0; r < 9; r++) {
-    for (let c1 = 0; c1 < 9; c1++) {
-      const i = r * 9 + c1;
+  for (let r = 0; r < N; r++) {
+    for (let c1 = 0; c1 < N; c1++) {
+      const i = r * N + c1;
       if (!grid[i]) continue;
-      for (let c2 = c1 + 1; c2 < 9; c2++) {
-        const j = r * 9 + c2;
+      for (let c2 = c1 + 1; c2 < N; c2++) {
+        const j = r * N + c2;
         if (grid[j] === grid[i]) mark(i, j);
       }
     }
   }
-  for (let c = 0; c < 9; c++) {
-    for (let r1 = 0; r1 < 9; r1++) {
-      const i = r1 * 9 + c;
+  for (let c = 0; c < N; c++) {
+    for (let r1 = 0; r1 < N; r1++) {
+      const i = r1 * N + c;
       if (!grid[i]) continue;
-      for (let r2 = r1 + 1; r2 < 9; r2++) {
-        const j = r2 * 9 + c;
+      for (let r2 = r1 + 1; r2 < N; r2++) {
+        const j = r2 * N + c;
         if (grid[j] === grid[i]) mark(i, j);
       }
     }
   }
-  for (let br = 0; br < 3; br++)
-    for (let bc = 0; bc < 3; bc++) {
+  for (let br = 0; br < N; br += boxH)
+    for (let bc = 0; bc < N; bc += boxW) {
       const cells = [];
-      for (let dr = 0; dr < 3; dr++)
-        for (let dc = 0; dc < 3; dc++)
-          cells.push((br * 3 + dr) * 9 + (bc * 3 + dc));
+      for (let dr = 0; dr < boxH; dr++)
+        for (let dc = 0; dc < boxW; dc++)
+          cells.push((br + dr) * N + (bc + dc));
       for (let a = 0; a < cells.length; a++)
         for (let b = a + 1; b < cells.length; b++)
           if (grid[cells[a]] && grid[cells[a]] === grid[cells[b]]) mark(cells[a], cells[b]);
@@ -271,7 +280,7 @@ socket.on("disconnect", () => toast(t("reconnecting"), "error"));
 function applyState(next) {
   if (next.status === "playing") {
     // Anchor the local timer the first time we see "playing" this game.
-    if (state?.status !== "playing" || !startLocal) startLocal = Date.now();
+    if (state?.status !== "playing" || !startLocal) { startLocal = Date.now(); selected = -1; }
     if (!tickHandle) startTick();
   } else {
     stopTick();
@@ -318,10 +327,11 @@ function startSolo() {
   const name = (drafts.name || "").trim();
   if (!name) return toast(t("your_name"), "error");
   const diff = drafts.difficulty || "medium";
+  const size = drafts.size || "classic";
   socket.emit("sdk_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
     saveSession({ code: res.code, playerId: res.playerId });
-    socket.emit("sdk_settings", { difficulty: diff });
+    socket.emit("sdk_settings", { difficulty: diff, size });
     socket.emit("sdk_start", { solo: true });
     applyState(res.state);
   });
@@ -377,6 +387,11 @@ function difficultySelect() {
     ${["easy", "medium", "hard"].map((d) => `<option value="${d}" ${drafts.difficulty === d ? "selected" : ""}>${t(d)}</option>`).join("")}
   </select>`;
 }
+function sizeSelect() {
+  return `<select class="sdk-select" id="sdk-size">
+    ${["mini", "classic"].map((s) => `<option value="${s}" ${drafts.size === s ? "selected" : ""}>${t("size_" + s)}</option>`).join("")}
+  </select>`;
+}
 
 function renderPre() {
   if (pre === "solo") {
@@ -386,6 +401,8 @@ function renderPre() {
         <h2 class="sdk-h2">${t("solo_title")}</h2>
         <label class="sdk-label">${t("your_name")}</label>
         <input class="sdk-input" id="sdk-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <label class="sdk-label">${t("board_size")}</label>
+        ${sizeSelect()}
         <label class="sdk-label">${t("difficulty")}</label>
         ${difficultySelect()}
         <label class="sdk-label">${t("pick_color")}</label>
@@ -452,6 +469,9 @@ function renderLobby() {
   const diffOptions = ["easy", "medium", "hard"]
     .map((d) => `<option value="${d}" ${state.settings.difficulty === d ? "selected" : ""}>${t(d)}</option>`)
     .join("");
+  const sizeOptions = ["mini", "classic"]
+    .map((s) => `<option value="${s}" ${state.settings.size === s ? "selected" : ""}>${t("size_" + s)}</option>`)
+    .join("");
 
   $app.innerHTML = shell(`
     <div class="sdk-lobby">
@@ -481,6 +501,10 @@ function renderLobby() {
           </select>
         </div>
         <div class="sdk-set-row">
+          <label class="sdk-label">${t("board_size")}</label>
+          <select class="sdk-select" data-set="size">${sizeOptions}</select>
+        </div>
+        <div class="sdk-set-row">
           <label class="sdk-label">${t("difficulty")}</label>
           <select class="sdk-select" data-set="difficulty">${diffOptions}</select>
         </div>
@@ -495,35 +519,37 @@ function renderLobby() {
 }
 
 function boardHTML() {
+  const { N, boxH, boxW, cells: total } = dims();
   const bad = conflictSet();
   const cells = [];
-  for (let i = 0; i < 81; i++) {
+  for (let i = 0; i < total; i++) {
     const v = grid[i];
     const given = state.given?.[i];
-    const r = Math.floor(i / 9);
-    const c = i % 9;
+    const r = Math.floor(i / N);
+    const c = i % N;
     const classes = ["sdk-cell"];
     if (given) classes.push("given");
     if (i === selected) classes.push("sel");
     if (v && bad.has(i)) classes.push("bad");
     if (selected >= 0 && v && v === grid[selected] && i !== selected) classes.push("same");
-    if (c % 3 === 2 && c !== 8) classes.push("br");
-    if (r % 3 === 2 && r !== 8) classes.push("bb");
+    if (c % boxW === boxW - 1 && c !== N - 1) classes.push("br");
+    if (r % boxH === boxH - 1 && r !== N - 1) classes.push("bb");
     cells.push(`<button class="${classes.join(" ")}" data-cell="${i}" ${given ? "disabled" : ""}>${v || ""}</button>`);
   }
-  return `<div class="sdk-board">${cells.join("")}</div>`;
+  return `<div class="sdk-board" style="grid-template-columns:repeat(${N},1fr)">${cells.join("")}</div>`;
 }
 
 function padHTML() {
-  const counts = new Array(10).fill(0);
+  const { N } = dims();
+  const counts = new Array(N + 1).fill(0);
   for (const v of grid) if (v) counts[v]++;
   const keys = [];
-  for (let n = 1; n <= 9; n++) {
-    const done = counts[n] >= 9;
+  for (let n = 1; n <= N; n++) {
+    const done = counts[n] >= N;
     keys.push(`<button class="sdk-key ${done ? "done" : ""}" data-num="${n}">${n}</button>`);
   }
   keys.push(`<button class="sdk-key erase" data-num="0">⌫</button>`);
-  return `<div class="sdk-pad">${keys.join("")}</div>`;
+  return `<div class="sdk-pad" style="grid-template-columns:repeat(${N + 1},1fr)">${keys.join("")}</div>`;
 }
 
 function progressPanel() {
@@ -554,8 +580,13 @@ function renderPlaying() {
         <div class="sdk-hud-item"><span class="sdk-hud-k">${t("time")}</span><span class="sdk-hud-v" id="sdk-timer">${fmtTime(Date.now() - startLocal)}</span></div>
       </div>
       ${boardHTML()}
+      ${state.solo ? `
+      <div class="sdk-hintbar">
+        <span class="sdk-hintbar-txt">✨ ${t("stuck")}</span>
+        <button class="sdk-hintbar-btn" data-act="hint">${t("use_hint")}</button>
+      </div>` : ""}
       ${padHTML()}
-      <div class="sdk-hint sdk-center">${t("shared_hint")}</div>
+      ${state.solo ? "" : `<div class="sdk-hint sdk-center">${t("shared_hint")}</div>`}
       <div class="sdk-progress">
         <h3 class="sdk-h3">${t("progress")}</h3>
         ${progressPanel()}
@@ -579,7 +610,7 @@ function renderFinished() {
         <div class="sdk-card sdk-center sdk-champ" style="--tc:${teamColor(myTeam())}">
           <div class="sdk-trophy big">${finished ? "🎉" : "🧩"}</div>
           <div class="sdk-champ-label">${t("solo_done")}</div>
-          ${finished ? `<div class="sdk-champ-team" style="color:${teamColor(myTeam())}">${fmtTime(mine.finishMs)}</div>` : `<div class="sdk-muted">${mine?.filled ?? 0}/81</div>`}
+          ${finished ? `<div class="sdk-champ-team" style="color:${teamColor(myTeam())}">${fmtTime(mine.finishMs)}</div>` : `<div class="sdk-muted">${mine?.filled ?? 0}/${state.cellsTotal || 81}</div>`}
           <div class="sdk-muted">${t(state.difficulty)}</div>
         </div>
         ${host ? `<button class="sdk-btn primary full" data-act="again">${t("play_again")}</button>` : ""}
@@ -606,7 +637,7 @@ function renderFinished() {
               <span class="sdk-rank">${i + 1}</span>
               <span class="sdk-swatch"></span>
               <span class="sdk-winname">${esc(loc(s.name))}</span>
-              <span class="sdk-wincount">${s.finishMs != null ? fmtTime(s.finishMs) : `${s.filled}/81`}</span>
+              <span class="sdk-wincount">${s.finishMs != null ? fmtTime(s.finishMs) : `${s.filled}/${state.cellsTotal || 81}`}</span>
             </div>`).join("")}
         </div>
       </div>
@@ -623,9 +654,10 @@ $app.addEventListener("input", (e) => {
 });
 $app.addEventListener("change", (e) => {
   if (e.target.id === "sdk-diff") { drafts.difficulty = e.target.value; return; }
+  if (e.target.id === "sdk-size") { drafts.size = e.target.value; return; }
   const set = e.target.dataset.set;
   if (set) {
-    const val = set === "difficulty" ? e.target.value : Number(e.target.value);
+    const val = set === "numTeams" ? Number(e.target.value) : e.target.value;
     socket.emit("sdk_settings", { [set]: val });
   }
 });
@@ -656,6 +688,7 @@ $app.addEventListener("click", (e) => {
     case "join": return joinRoom();
     case "solo": return startSolo();
     case "start": return socket.emit("sdk_start");
+    case "hint": sfx.point?.(); return socket.emit("sdk_hint");
     case "end": return socket.emit("sdk_end");
     case "again":
       // In solo, "play again" spins up a fresh puzzle immediately.
@@ -674,16 +707,18 @@ $app.addEventListener("click", (e) => {
 // Keyboard entry on desktop.
 window.addEventListener("keydown", (e) => {
   if (!state || state.status !== "playing" || selected < 0) return;
-  if (e.key >= "1" && e.key <= "9") { inputValue(Number(e.key)); e.preventDefault(); }
+  const { N } = dims();
+  const digit = Number(e.key);
+  if (Number.isInteger(digit) && digit >= 1 && digit <= N) { inputValue(digit); e.preventDefault(); }
   else if (e.key === "0" || e.key === "Backspace" || e.key === "Delete") { inputValue(0); e.preventDefault(); }
   else if (e.key.startsWith("Arrow")) {
-    const r = Math.floor(selected / 9), c = selected % 9;
+    const r = Math.floor(selected / N), c = selected % N;
     let nr = r, nc = c;
     if (e.key === "ArrowUp") nr = Math.max(0, r - 1);
-    if (e.key === "ArrowDown") nr = Math.min(8, r + 1);
+    if (e.key === "ArrowDown") nr = Math.min(N - 1, r + 1);
     if (e.key === "ArrowLeft") nc = Math.max(0, c - 1);
-    if (e.key === "ArrowRight") nc = Math.min(8, c + 1);
-    selected = nr * 9 + nc;
+    if (e.key === "ArrowRight") nc = Math.min(N - 1, c + 1);
+    selected = nr * N + nc;
     render();
     e.preventDefault();
   }

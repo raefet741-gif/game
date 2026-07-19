@@ -252,7 +252,7 @@ html[lang="ar"] .mm-h3 {
 .mm-cell .mm-back {
   background: linear-gradient(150deg, var(--violet), var(--panel-2));
   border: 1px solid var(--line-strong);
-  color: rgba(240, 238, 255, 0.35);
+  color: rgba(26, 21, 18, 0.32);
   font-weight: 800;
   font-size: clamp(14px, 4vw, 22px);
 }

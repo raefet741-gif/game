@@ -36,11 +36,19 @@ export const TEAM_DEFS = [
   { color: "#FB923C", name: { en: "Orange", fr: "Orange", ar: "البرتقالي" } },
 ];
 
-// Difficulty → how many of the 81 cells are given as clues. Fewer clues = harder.
+// Board sizes. "classic" is a normal 9×9 (3×3 boxes); "mini" is a LinkedIn-style
+// 6×6 with 2-row × 3-col boxes and digits 1–6 — quicker and easier.
+export const SIZES = ["classic", "mini"];
+export function dimsFor(size) {
+  if (size === "mini") return { size: "mini", N: 6, boxH: 2, boxW: 3, cells: 36 };
+  return { size: "classic", N: 9, boxH: 3, boxW: 3, cells: 81 };
+}
+
+// Difficulty → how many cells are given as clues, per board size. Fewer = harder.
 export const DIFFICULTIES = {
-  easy: { clues: 42 },
-  medium: { clues: 34 },
-  hard: { clues: 28 },
+  easy: { classic: 42, mini: 24 },
+  medium: { classic: 34, mini: 20 },
+  hard: { classic: 28, mini: 16 },
 };
 
 // Reward economy (per game).
@@ -67,78 +75,113 @@ function shuffle(arr) {
 }
 
 // ---------------------------------------------------------------------------
-// Sudoku generation. Grids are flat 81-length arrays (0 = empty). Index = r*9+c.
+// Sudoku generation. Grids are flat arrays (0 = empty), index = r*N+c, sized by
+// `dims` (classic 9×9 or mini 6×6). All engine helpers take `dims` so both work.
 // ---------------------------------------------------------------------------
-function canPlace(grid, idx, val) {
-  const r = Math.floor(idx / 9);
-  const c = idx % 9;
-  for (let i = 0; i < 9; i++) {
-    if (grid[r * 9 + i] === val) return false; // row
-    if (grid[i * 9 + c] === val) return false; // col
+function canPlace(grid, idx, val, dims) {
+  const { N, boxH, boxW } = dims;
+  const r = Math.floor(idx / N);
+  const c = idx % N;
+  for (let i = 0; i < N; i++) {
+    if (grid[r * N + i] === val) return false; // row
+    if (grid[i * N + c] === val) return false; // col
   }
-  const br = Math.floor(r / 3) * 3;
-  const bc = Math.floor(c / 3) * 3;
-  for (let dr = 0; dr < 3; dr++)
-    for (let dc = 0; dc < 3; dc++)
-      if (grid[(br + dr) * 9 + (bc + dc)] === val) return false; // box
+  const br = Math.floor(r / boxH) * boxH;
+  const bc = Math.floor(c / boxW) * boxW;
+  for (let dr = 0; dr < boxH; dr++)
+    for (let dc = 0; dc < boxW; dc++)
+      if (grid[(br + dr) * N + (bc + dc)] === val) return false; // box
   return true;
 }
 
 // Fill an empty grid with a random complete valid solution (backtracking).
-function fillSolution(grid, pos = 0) {
-  if (pos === 81) return true;
-  if (grid[pos] !== 0) return fillSolution(grid, pos + 1);
-  for (const val of shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9])) {
-    if (canPlace(grid, pos, val)) {
+function fillSolution(grid, dims, pos = 0) {
+  if (pos === dims.cells) return true;
+  if (grid[pos] !== 0) return fillSolution(grid, dims, pos + 1);
+  const digits = shuffle(Array.from({ length: dims.N }, (_, i) => i + 1));
+  for (const val of digits) {
+    if (canPlace(grid, pos, val, dims)) {
       grid[pos] = val;
-      if (fillSolution(grid, pos + 1)) return true;
+      if (fillSolution(grid, dims, pos + 1)) return true;
       grid[pos] = 0;
     }
   }
   return false;
 }
 
-// Generate a puzzle: full solution + a `given` mask keeping `clues` cells.
-// Clues are removed symmetrically (mirror pairs) which reads more like a real
-// Sudoku. Win is validated by Sudoku rules, so alternate solutions are fine.
-function generatePuzzle(clues) {
-  const solution = new Array(81).fill(0);
-  fillSolution(solution);
+// Count solutions of a puzzle, stopping at `limit` (used to force uniqueness).
+function countSolutions(grid, dims, limit = 2) {
+  const g = grid.slice();
+  let count = 0;
+  const solve = (pos) => {
+    if (count >= limit) return;
+    if (pos === dims.cells) { count++; return; }
+    if (g[pos] !== 0) { solve(pos + 1); return; }
+    for (let val = 1; val <= dims.N; val++) {
+      if (canPlace(g, pos, val, dims)) {
+        g[pos] = val;
+        solve(pos + 1);
+        g[pos] = 0;
+        if (count >= limit) return;
+      }
+    }
+  };
+  solve(0);
+  return count;
+}
 
-  const given = new Array(81).fill(true);
-  let remaining = 81;
-  const order = shuffle([...Array(81).keys()]);
+// Generate a puzzle: full solution + a `given` mask keeping ~`clues` cells.
+// Clues are removed in mirror pairs, but only if the puzzle stays UNIQUELY
+// solvable — so the stored solution is the answer (which makes hints correct).
+function generatePuzzle(dims, clues) {
+  const solution = new Array(dims.cells).fill(0);
+  fillSolution(solution, dims);
+
+  const puzzle = solution.slice();
+  const given = new Array(dims.cells).fill(true);
+  let remaining = dims.cells;
+  const order = shuffle([...Array(dims.cells).keys()]);
   for (const idx of order) {
     if (remaining <= clues) break;
     if (!given[idx]) continue;
-    const mirror = 80 - idx;
-    given[idx] = false;
-    remaining--;
-    if (mirror !== idx && given[mirror] && remaining > clues) {
-      given[mirror] = false;
-      remaining--;
+    const mirror = dims.cells - 1 - idx;
+    const removed = [];
+    const drop = (k) => {
+      if (given[k]) { given[k] = false; puzzle[k] = 0; removed.push(k); remaining--; }
+    };
+    drop(idx);
+    if (mirror !== idx && remaining > clues) drop(mirror);
+    // Revert this removal if it made the puzzle ambiguous.
+    if (countSolutions(puzzle, dims, 2) !== 1) {
+      for (const k of removed) { given[k] = true; puzzle[k] = solution[k]; remaining++; }
     }
   }
 
-  const puzzle = solution.map((v, i) => (given[i] ? v : 0));
-  return { puzzle, given };
+  return { puzzle, given, solution };
 }
 
-// Is a filled grid (all 81 non-zero) a valid Sudoku solution?
-function isSolved(grid) {
-  for (let i = 0; i < 81; i++) if (!grid[i]) return false;
-  for (let u = 0; u < 9; u++) {
+// Is a filled grid (all cells non-zero) a valid Sudoku solution?
+function isSolved(grid, dims) {
+  const { N, boxH, boxW } = dims;
+  for (let i = 0; i < dims.cells; i++) if (!grid[i]) return false;
+  for (let u = 0; u < N; u++) {
     const row = new Set();
     const col = new Set();
-    const box = new Set();
-    for (let k = 0; k < 9; k++) {
-      row.add(grid[u * 9 + k]);
-      col.add(grid[k * 9 + u]);
-      const br = Math.floor(u / 3) * 3 + Math.floor(k / 3);
-      const bc = (u % 3) * 3 + (k % 3);
-      box.add(grid[br * 9 + bc]);
+    for (let k = 0; k < N; k++) {
+      row.add(grid[u * N + k]);
+      col.add(grid[k * N + u]);
     }
-    if (row.size !== 9 || col.size !== 9 || box.size !== 9) return false;
+    if (row.size !== N || col.size !== N) return false;
+  }
+  const boxesPerRow = N / boxW;
+  for (let b = 0; b < N; b++) {
+    const box = new Set();
+    const boxRow = Math.floor(b / boxesPerRow) * boxH;
+    const boxCol = (b % boxesPerRow) * boxW;
+    for (let dr = 0; dr < boxH; dr++)
+      for (let dc = 0; dc < boxW; dc++)
+        box.add(grid[(boxRow + dr) * N + (boxCol + dc)]);
+    if (box.size !== N) return false;
   }
   return true;
 }
@@ -184,12 +227,15 @@ class SudokuRoom {
     this.settings = {
       numTeams: 2,
       difficulty: "medium",
+      size: "classic", // classic 9×9 | mini 6×6
     };
     this.players = [];
 
     this.solo = false; // true when a single player is racing only the clock
-    this.puzzle = null; // 81 (0 = blank, else given clue)
-    this.given = null; // 81 booleans
+    this.dims = dimsFor("classic"); // board geometry for the current game
+    this.puzzle = null; // cells (0 = blank, else given clue)
+    this.given = null; // cells booleans
+    this.solution = null; // the unique solution (used for hints)
     this.teamGrids = {}; // teamIndex -> 81 numbers (working grid)
     this.teamFinish = {}; // teamIndex -> finishMs
     this.startMs = null;
@@ -288,6 +334,9 @@ class SudokuRoom {
     if ("difficulty" in patch && DIFFICULTIES[patch.difficulty]) {
       s.difficulty = patch.difficulty;
     }
+    if ("size" in patch && SIZES.includes(patch.size)) {
+      s.size = patch.size;
+    }
   }
 
   // ---------- game flow ----------
@@ -306,10 +355,13 @@ class SudokuRoom {
     }
     this.solo = solo;
 
-    const clues = DIFFICULTIES[this.settings.difficulty].clues;
-    const { puzzle, given } = generatePuzzle(clues);
+    const dims = dimsFor(this.settings.size);
+    const clues = DIFFICULTIES[this.settings.difficulty][dims.size];
+    const { puzzle, given, solution } = generatePuzzle(dims, clues);
+    this.dims = dims;
     this.puzzle = puzzle;
     this.given = given;
+    this.solution = solution;
     this.teamGrids = {};
     this.teamFinish = {};
     for (const t of this.filledTeams()) this.teamGrids[t] = puzzle.slice();
@@ -330,8 +382,8 @@ class SudokuRoom {
     if (!p || !p.connected) return;
     idx = Number(idx);
     val = Number(val);
-    if (!Number.isInteger(idx) || idx < 0 || idx > 80) return;
-    if (!Number.isInteger(val) || val < 0 || val > 9) return;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= this.dims.cells) return;
+    if (!Number.isInteger(val) || val < 0 || val > this.dims.N) return;
     if (this.given[idx]) return; // clue cell — immutable
     const grid = this.teamGrids[p.team];
     if (!grid) return;
@@ -340,7 +392,29 @@ class SudokuRoom {
     grid[idx] = val;
     this.emitTeamGrid(p.team, { by: p.id, idx });
 
-    if (isSolved(grid)) {
+    if (isSolved(grid, this.dims)) {
+      this.teamFinish[p.team] = Date.now() - this.startMs;
+      this.finishGame(p.team);
+    }
+  }
+
+  // Reveal one correct empty cell (locked as a clue). Solo only — it would be
+  // unfair in a race — and mirrors the LinkedIn "use a hint" affordance.
+  hint(playerId) {
+    if (this.status !== "playing" || !this.solo) return;
+    const p = this.getPlayer(playerId);
+    if (!p || !this.solution) return;
+    const grid = this.teamGrids[p.team];
+    if (!grid) return;
+    const empties = [];
+    for (let i = 0; i < this.dims.cells; i++)
+      if (!this.given[i] && !grid[i]) empties.push(i);
+    if (!empties.length) return;
+    const idx = empties[Math.floor(Math.random() * empties.length)];
+    grid[idx] = this.solution[idx];
+    this.given[idx] = true; // lock the revealed cell
+    this.emitTeamGrid(p.team, { hint: idx });
+    if (isSolved(grid, this.dims)) {
       this.teamFinish[p.team] = Date.now() - this.startMs;
       this.finishGame(p.team);
     }
@@ -407,6 +481,7 @@ class SudokuRoom {
         won,
         played: true,
         mode: this.solo ? "solo" : "versus",
+        game: "sudoku",
       });
       if (res && p.socketId && ioNsp) {
         ioNsp.to(p.socketId).emit("sdk_reward", {
@@ -425,6 +500,7 @@ class SudokuRoom {
     this.status = "lobby";
     this.puzzle = null;
     this.given = null;
+    this.solution = null;
     this.teamGrids = {};
     this.teamFinish = {};
     this.startMs = null;
@@ -439,7 +515,7 @@ class SudokuRoom {
     const grid = this.teamGrids[team];
     if (!grid) return 0;
     let n = 0;
-    for (let i = 0; i < 81; i++) if (grid[i]) n++;
+    for (let i = 0; i < this.dims.cells; i++) if (grid[i]) n++;
     return n;
   }
 
@@ -481,12 +557,14 @@ class SudokuRoom {
       solo: this.solo,
       settings: this.settings,
       difficulty: this.settings.difficulty,
+      size: this.settings.size,
+      dims: this.status === "lobby" ? dimsFor(this.settings.size) : this.dims,
       given: this.status === "lobby" ? null : this.given,
       puzzle: this.status === "lobby" ? null : this.puzzle,
       teams: this.teamsState(),
       players: this.players.map((p) => this.publicPlayer(p)),
       startMs: this.startMs,
-      cellsTotal: 81,
+      cellsTotal: this.status === "lobby" ? dimsFor(this.settings.size).cells : this.dims.cells,
       winnerTeam: this.winnerTeam,
       result: this.result,
     };
@@ -629,6 +707,10 @@ export function attachSudokuIO(io, serverUrl) {
       // setCell resolves its own targeted grid emit + broadcast.
       const { room, player } = ctx(socket);
       if (room && player) room.setCell(player.id, idx, val);
+    });
+    socket.on("sdk_hint", () => {
+      const { room, player } = ctx(socket);
+      if (room && player) room.hint(player.id);
     });
     socket.on("sdk_end", () =>
       handle(socket, (room, player) => room.endByHost(player.id))

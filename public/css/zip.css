@@ -1,0 +1,349 @@
+/* ZIP RACE — game skin, built on the shared SPILL design tokens */
+
+.zip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 16px 6px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+.zip-logo {
+  font-family: var(--display);
+  letter-spacing: 1px;
+  font-size: 18px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+html[lang="ar"] .zip-logo,
+html[lang="ar"] .zip-brand,
+html[lang="ar"] .zip-h2,
+html[lang="ar"] .zip-h3 {
+  font-family: "Cairo", "Segoe UI", Tahoma, sans-serif;
+  font-weight: 900;
+}
+
+.zip-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px 16px 60px;
+}
+.zip-wrap-narrow {
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- hero / landing ---------- */
+.zip-hero {
+  text-align: center;
+  padding: 8vh 12px 4vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.zip-emoji {
+  font-size: 64px;
+  filter: drop-shadow(0 8px 22px rgba(56, 189, 248, 0.55));
+  animation: zip-bob 4s ease-in-out infinite;
+}
+.zip-brand {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: clamp(40px, 11vw, 84px);
+  line-height: 0.95;
+  background: linear-gradient(100deg, var(--cyan), var(--violet) 55%, var(--pink));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: zip-sheen 6s linear infinite;
+}
+@keyframes zip-sheen { to { background-position: 200% center; } }
+.zip-tagline {
+  color: var(--muted);
+  max-width: 36ch;
+  font-size: clamp(15px, 3.4vw, 18px);
+}
+.zip-cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* ---------- buttons / inputs ---------- */
+.zip-btn {
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 13px 26px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--panel-2);
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s;
+}
+.zip-btn:hover { transform: translateY(-2px); }
+.zip-btn:active { transform: translateY(0); }
+.zip-btn.primary {
+  color: #08121a;
+  background: linear-gradient(120deg, var(--cyan), var(--violet));
+  box-shadow: var(--glow-cyan);
+}
+.zip-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.zip-btn.small { padding: 9px 18px; font-size: 13.5px; }
+.zip-btn.full { width: 100%; margin-top: 12px; }
+
+.zip-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 8px 2px;
+  align-self: flex-start;
+}
+.zip-link:hover { color: var(--text); }
+.zip-link.danger:hover { color: var(--red); }
+
+.zip-input,
+.zip-select {
+  width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--ink-2);
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.zip-select { padding: 10px 12px; }
+.zip-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 12px 2px 6px;
+}
+
+.zip-colors { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.zip-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.zip-dot.on { border-color: var(--text); transform: scale(1.15); }
+
+/* ---------- cards ---------- */
+.zip-card {
+  background: linear-gradient(180deg, var(--panel), var(--ink-2));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.zip-form { max-width: 420px; margin: 4vh auto 0; display: flex; flex-direction: column; }
+.zip-center { text-align: center; }
+.zip-muted { color: var(--muted); }
+.zip-h2 { font-family: var(--display); letter-spacing: 1px; font-size: 26px; margin: 6px 0 4px; }
+.zip-h3 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--text); margin-bottom: 12px; }
+.zip-hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+/* ---------- lobby ---------- */
+.zip-lobby { display: flex; flex-direction: column; }
+.zip-code-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.zip-code {
+  font-family: var(--display);
+  font-size: clamp(26px, 8vw, 40px);
+  letter-spacing: 3px;
+  color: var(--cyan);
+}
+.zip-qr { width: 92px; height: 92px; border-radius: 12px; background: #fff; padding: 5px; }
+
+.zip-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.zip-team {
+  text-align: start;
+  border-radius: var(--r);
+  border: 1.5px solid var(--line-strong);
+  background: color-mix(in srgb, var(--tc) 10%, var(--ink-2));
+  padding: 14px;
+  min-height: 92px;
+  transition: transform 0.12s, box-shadow 0.2s, border-color 0.2s;
+}
+.zip-team:hover { transform: translateY(-2px); }
+.zip-team.mine { border-color: var(--tc); box-shadow: 0 0 0 1px var(--tc), 0 8px 24px color-mix(in srgb, var(--tc) 35%, transparent); }
+.zip-team-name { font-weight: 800; color: var(--tc); margin-bottom: 8px; }
+.zip-team-members { display: flex; flex-wrap: wrap; gap: 6px; }
+.zip-chip {
+  font-size: 12.5px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--pc) 22%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--pc) 50%, transparent);
+  color: var(--text);
+}
+.zip-empty { color: var(--muted); font-size: 13px; }
+.zip-set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.zip-set-row .zip-label { margin: 0; }
+.zip-set-row .zip-select { width: auto; min-width: 110px; margin: 0; }
+
+/* ---------- play ---------- */
+.zip-play { display: flex; flex-direction: column; gap: 14px; }
+.zip-hud {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px;
+}
+.zip-hud-item { text-align: center; }
+.zip-hud-k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.zip-hud-v { display: block; font-weight: 800; font-size: 18px; color: var(--text); }
+.zip-actions { display: flex; justify-content: center; }
+
+/* ---------- board ---------- */
+.zip-board {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  background: var(--line-strong);
+  border: 3px solid var(--line-strong);
+  border-radius: 12px;
+  padding: 3px;
+  touch-action: none; /* let us own drag gestures */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.zip-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  grid-template-rows: repeat(var(--n), 1fr);
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+}
+.zip-cell {
+  position: relative;
+  border: none;
+  border-radius: 6px;
+  background: var(--ink-2);
+  color: var(--text);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.zip-cell:hover { background: color-mix(in srgb, var(--cyan) 10%, var(--ink-2)); }
+.zip-cell.on { background: color-mix(in srgb, var(--tc) 26%, var(--ink-2)); }
+.zip-cell.head { box-shadow: inset 0 0 0 2px var(--tc); }
+.zip-num {
+  position: relative;
+  z-index: 3;
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: clamp(15px, 5vw, 24px);
+  font-variant-numeric: tabular-nums;
+  background: var(--text);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* SVG overlay: the drawn line + walls, sitting above cells but click-through. */
+.zip-svg {
+  position: absolute;
+  inset: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+.zip-line {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 0.34;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 16px; /* non-scaling → pixel width */
+}
+.zip-wall {
+  stroke: #fff;
+  stroke-width: 4px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.85;
+}
+
+/* ---------- progress ---------- */
+.zip-prow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--r-sm);
+  border-inline-start: 3px solid var(--tc);
+  background: color-mix(in srgb, var(--tc) 8%, var(--ink-2));
+  margin-bottom: 8px;
+}
+.zip-prow.me { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tc) 45%, transparent); }
+.zip-pname { font-weight: 700; color: var(--tc); font-size: 13.5px; min-width: 74px; }
+.zip-done { color: var(--green); font-weight: 800; }
+.zip-pbar { flex: 1; height: 8px; border-radius: 999px; background: var(--ink); overflow: hidden; }
+.zip-pbar span { display: block; height: 100%; border-radius: 999px; background: var(--tc); transition: width 0.35s ease; }
+.zip-pcount { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 48px; text-align: end; }
+
+/* ---------- finished ---------- */
+.zip-trophy { font-size: 48px; }
+.zip-trophy.big { font-size: 72px; animation: zip-bob 3s ease-in-out infinite; }
+.zip-champ { padding: 26px 16px; }
+.zip-champ-label { text-transform: uppercase; letter-spacing: 2px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.zip-champ-team { font-family: var(--display); font-size: 40px; letter-spacing: 1px; }
+.zip-final-list { display: flex; flex-direction: column; gap: 8px; }
+.zip-finalrow { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-sm); background: var(--ink-2); }
+.zip-rank { font-family: var(--display); font-size: 18px; color: var(--muted); width: 22px; text-align: center; }
+.zip-swatch { width: 14px; height: 14px; border-radius: 4px; background: var(--tc); flex-shrink: 0; }
+.zip-winname { flex: 1; font-weight: 600; font-size: 13.5px; }
+.zip-wincount { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+@keyframes zip-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .zip-emoji, .zip-brand, .zip-trophy.big { animation: none !important; }
+}
+
+@media (max-width: 420px) {
+  .zip-hud-v { font-size: 16px; }
+  .zip-qr { width: 76px; height: 76px; }
+}

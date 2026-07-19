@@ -46,6 +46,10 @@ const T = {
     words_tag: "Swipe the letter wheel to spell words and fill the crossword. Play solo, versus, or in teams — first to finish wins.",
     draw_name: "DOODLE DUEL",
     draw_tag: "Sketch the word and let the AI or the room judge it — or pass drawings around the circle and guess your way to points.",
+    zip_name: "ZIP RACE",
+    zip_tag: "Draw one line that hits every number in order and fills the whole grid. Solo, 1v1 or team vs team — first to finish wins.",
+    queens_name: "KYUUBI QUEENS",
+    queens_tag: "One crown per row, column & color patch — and none may touch. Solo, 1v1 or team vs team, racing best-of-N by fastest time.",
     headsup_name: "HEADS UP",
     headsup_tag: "Guess what's on your card while the room gives you clues. Your own photo packs, coming next.",
     more: "More games coming",
@@ -90,6 +94,10 @@ const T = {
     words_tag: "Glisse sur la roue de lettres pour former des mots et remplir la grille. Solo, versus ou en équipes — le premier à finir gagne.",
     draw_name: "DOODLE DUEL",
     draw_tag: "Dessine le mot et laisse l'IA ou la salle juger — ou fais tourner les dessins dans le cercle et devine pour marquer des points.",
+    zip_name: "ZIP RACE",
+    zip_tag: "Trace une seule ligne qui passe chaque numéro dans l'ordre et remplit toute la grille. Solo, 1c1 ou équipe contre équipe — le premier à finir gagne.",
+    queens_name: "KYUUBI QUEENS",
+    queens_tag: "Une couronne par ligne, colonne et patch de couleur — sans jamais se toucher. Solo, 1c1 ou équipe contre équipe, au meilleur de N au temps le plus rapide.",
     headsup_name: "DEVINE",
     headsup_tag: "Devine ce que tu as pendant que la salle te donne des indices. Tes propres packs photos, bientôt.",
     more: "D'autres jeux arrivent",
@@ -133,6 +141,10 @@ const T = {
     words_tag: "اسحب على عجلة الحروف لتكوين الكلمات وملء الشبكة. فردي أو تنافسي أو بالفرق — أول من ينهي يفوز.",
     draw_name: "مبارزة الرسم",
     draw_tag: "ارسم الكلمة ودع الذكاء الاصطناعي أو الغرفة يحكم — أو مرّر الرسوم في الحلقة وخمّن لتجمع النقاط.",
+    zip_name: "سباق زيب",
+    zip_tag: "ارسم خطًا واحدًا يمرّ بكل رقم بالترتيب ويملأ الشبكة كاملة. فردي أو 1ضد1 أو فريق ضد فريق — أول من ينهي يفوز.",
+    queens_name: "ملكات كيوبي",
+    queens_tag: "تاج واحد لكل صف وعمود ورقعة لون — دون أن يتلامسا. فردي أو 1ضد1 أو فريق ضد فريق، الأفضل من N بأسرع وقت.",
     headsup_name: "خمّن",
     headsup_tag: "خمّن ما على بطاقتك بينما تعطيك الغرفة تلميحات. حزم صورك الخاصة قريبًا.",
     more: "المزيد من الألعاب قريبًا",
@@ -162,6 +174,46 @@ const T = {
     err_generic: "حدث خطأ ما — أعد المحاولة.",
   },
 };
+/* extra strings for the KyuubiZ ink-wash experience */
+Object.assign(T.en, {
+  enter_village: "Enter the village",
+  choose_game: "Choose your game",
+  register: "Register",
+  confirm_pass: "Confirm password",
+  auth_login_sub: "Log in to save your XP, coins & crowns.",
+  auth_reg_sub: "Create your account to save XP, coins & crowns.",
+  already_acct: "Already have an account?",
+  new_here: "New here?",
+  create_acct: "Create an account",
+  err_pass_match: "Passwords don't match.",
+  more_soon: "New drops every season.",
+});
+Object.assign(T.fr, {
+  enter_village: "Entrer au village",
+  choose_game: "Choisis ton jeu",
+  register: "S'inscrire",
+  confirm_pass: "Confirme le mot de passe",
+  auth_login_sub: "Connecte-toi pour garder ton XP, tes pièces et tes couronnes.",
+  auth_reg_sub: "Crée ton compte pour garder ton XP, tes pièces et tes couronnes.",
+  already_acct: "Déjà un compte ?",
+  new_here: "Nouveau ici ?",
+  create_acct: "Créer un compte",
+  err_pass_match: "Les mots de passe ne correspondent pas.",
+  more_soon: "De nouveaux jeux chaque saison.",
+});
+Object.assign(T.ar, {
+  enter_village: "ادخل القرية",
+  choose_game: "اختر لعبتك",
+  register: "إنشاء حساب",
+  confirm_pass: "أكّد كلمة المرور",
+  auth_login_sub: "سجّل الدخول لحفظ خبرتك وعملاتك وتيجانك.",
+  auth_reg_sub: "أنشئ حسابك لحفظ خبرتك وعملاتك وتيجانك.",
+  already_acct: "لديك حساب بالفعل؟",
+  new_here: "جديد هنا؟",
+  create_acct: "إنشاء حساب",
+  err_pass_match: "كلمتا المرور غير متطابقتين.",
+  more_soon: "ألعاب جديدة كل موسم.",
+});
 function t(k, params) {
   let s = (T[lang] || T.en)[k] ?? T.en[k] ?? k;
   if (params) s = s.replace(/\{(\w+)\}/g, (_, x) => (params[x] != null ? params[x] : ""));
@@ -214,6 +266,46 @@ const ACH_T = {
 function achMeta(id) {
   const a = (ACH_T[lang] && ACH_T[lang][id]) || ACH_T.en[id] || [id, ""];
   return { name: a[0], desc: a[1] };
+}
+
+/* competitive ranks: tier id → localized name + a few rank-screen strings.
+   The division (1–3) is appended as a number; Radiant has no division. */
+const RANK_T = {
+  en: {
+    iron: "Iron", bronze: "Bronze", silver: "Silver", gold: "Gold",
+    platinum: "Platinum", diamond: "Diamond", ascendant: "Ascendant",
+    immortal: "Immortal", radiant: "Radiant",
+    rank: "Rank", next_rank: "to next rank", top_rank: "Top rank — you're Radiant! 🌟",
+  },
+  fr: {
+    iron: "Fer", bronze: "Bronze", silver: "Argent", gold: "Or",
+    platinum: "Platine", diamond: "Diamant", ascendant: "Ascendant",
+    immortal: "Immortel", radiant: "Radiant",
+    rank: "Rang", next_rank: "avant le rang suivant", top_rank: "Rang max — tu es Radiant ! 🌟",
+  },
+  ar: {
+    iron: "حديد", bronze: "برونز", silver: "فضة", gold: "ذهب",
+    platinum: "بلاتين", diamond: "ماس", ascendant: "صاعد",
+    immortal: "خالد", radiant: "مشعّ",
+    rank: "الرتبة", next_rank: "حتى الرتبة التالية", top_rank: "أعلى رتبة — أنت مشعّ! 🌟",
+  },
+};
+function rtxt(key) {
+  return (RANK_T[lang] && RANK_T[lang][key]) || RANK_T.en[key] || key;
+}
+function rankLabel(rank) {
+  if (!rank) return "";
+  const name = rtxt(rank.tier);
+  return rank.division ? `${name} ${rank.division}` : name;
+}
+// Small colored pill showing the tier icon + name (+ division). size: "sm" | "lg".
+function rankBadge(rank, size) {
+  if (!rank) return "";
+  const cls = "rank-badge" + (size ? " " + size : "");
+  return `<span class="${cls}" style="--rank:${esc(rank.color)}" title="${esc(rankLabel(rank))}">
+    <span class="rank-ic">${rank.icon}</span>
+    <span class="rank-tx">${esc(rankLabel(rank))}</span>
+  </span>`;
 }
 
 /* ---------------- helpers ---------------- */
@@ -269,7 +361,7 @@ function accountChip() {
     return `<button class="acct-chip" data-act="open-profile">
       <span class="avatar sm" style="background:${esc(account.color)}">${esc(initial(account.name))}</span>
       <span class="acct-name">${esc(account.name)}</span>
-      <span class="acct-lvl">${t("lvl")} ${account.level}</span>
+      ${account.rank ? rankBadge(account.rank, "sm") : `<span class="acct-lvl">${t("lvl")} ${account.level}</span>`}
     </button>`;
   }
   return `<button class="btn btn-cyan sm" data-act="open-auth">👤 ${t("login")}</button>`;
@@ -311,6 +403,7 @@ function leaderboardModal() {
         <span class="gl-rank">${medal}</span>
         <span class="avatar sm" style="background:${esc(p.color)}">${esc(initial(p.name))}</span>
         <span class="gl-name">${esc(p.name)}</span>
+        ${p.rank ? rankBadge(p.rank, "sm") : ""}
         <span class="gl-lvl">${sub}</span>
         <span class="gl-xp">${p.xp} XP</span>
       </div>`;
@@ -326,27 +419,149 @@ const GAMES = [
   { id: "puzzle", href: "/puzzle", emoji: "🧩", accent: "var(--gold)", name: () => t("puzzle_name"), tag: () => t("puzzle_tag"), pill: { en: "Jigsaw · AI", fr: "Puzzle · IA", ar: "أحجية · ذكاء" }, ready: true },
   { id: "words", href: "/words", emoji: "🔤", accent: "var(--pink)", name: () => t("words_name"), tag: () => t("words_tag"), pill: { en: "Word race", fr: "Course de mots", ar: "سباق الكلمات" }, ready: true },
   { id: "draw", href: "/draw", emoji: "🎨", accent: "var(--violet)", name: () => t("draw_name"), tag: () => t("draw_tag"), pill: { en: "Draw · AI · Guess", fr: "Dessin · IA · Devine", ar: "رسم · ذكاء · تخمين" }, ready: true },
+  { id: "queens", href: "/queens", emoji: "👑", accent: "var(--gold)", name: () => t("queens_name"), tag: () => t("queens_tag"), pill: { en: "Crown logic", fr: "Logique couronnes", ar: "منطق التيجان" }, ready: true },
+  { id: "zip", href: "/zip", emoji: "⚡", accent: "var(--cyan)", name: () => t("zip_name"), tag: () => t("zip_tag"), pill: { en: "Team vs team", fr: "Équipe vs équipe", ar: "فريق ضد فريق" }, ready: true },
   { id: "headsup", href: "#", emoji: "🧠", accent: "var(--violet)", name: () => t("headsup_name"), tag: () => t("headsup_tag"), pill: { en: "Guessing", fr: "Devinettes", ar: "تخمين" }, ready: false },
 ];
-function cardHTML(g, i) {
-  const pill = g.pill[lang] || g.pill.en;
-  const cta = g.ready
-    ? account
-      ? `<span class="gc-cta">${t("play")} <span aria-hidden="true">→</span></span>`
-      : `<span class="gc-cta">🔒 ${t("login_to_play")}</span>`
-    : `<span class="gc-badge">🔒 ${t("soon")}</span>`;
-  const inner = `
-    <span class="gc-tag-pill">${pill}</span>
-    <div class="gc-emoji">${g.emoji}</div>
-    <div class="gc-name">${g.name()}</div>
-    <div class="gc-tag">${g.tag()}</div>
-    ${cta}`;
-  const style = `--accent:${g.accent};animation-delay:${(i * 0.12).toFixed(2)}s`;
-  // Games require an account — logged out, the card opens the login modal instead.
-  if (g.ready && account) return `<a class="game-card ready" href="${g.href}" style="${style}">${inner}</a>`;
-  if (g.ready) return `<div class="game-card ready" data-act="require-login" style="${style}">${inner}</div>`;
-  return `<div class="game-card soon" style="${style}">${inner}</div>`;
+/* which of the three KyuubiZ screens is showing: accueil → auth → games */
+let view = "accueil";
+
+// falling cherry-blossom petals — a fixed overlay drawn over every screen (cached).
+// Signature of the KyuubiZ design, so shown even under reduced-motion.
+let _petalCache = null;
+function petalsHTML() {
+  if (!_petalCache) {
+    // two sakura tones so the fall reads clearly over the busy hero art
+    const tones = [
+      "linear-gradient(135deg,#e8455a,#b81f2a 72%)",
+      "linear-gradient(135deg,#ff9db0,#e05a70 72%)",
+    ];
+    let s = "";
+    for (let i = 0; i < 40; i++) {
+      const w = (12 + Math.random() * 12).toFixed(1);
+      const h = (w * (1.1 + Math.random() * 0.3)).toFixed(1);
+      const left = (Math.random() * 100).toFixed(1);
+      const tx = (-160 + Math.random() * 320).toFixed(0);
+      const dur = (8 + Math.random() * 8).toFixed(1);
+      const delay = (-Math.random() * 12).toFixed(1); // negative → some already falling on load
+      const op = (0.6 + Math.random() * 0.4).toFixed(2);
+      const bg = tones[i % tones.length];
+      s += `<span class="kz-petal" style="left:${left}%;width:${w}px;height:${h}px;--tx:${tx}px;background:${bg};animation-duration:${dur}s;animation-delay:${delay}s;opacity:${op}"></span>`;
+    }
+    _petalCache = s;
+  }
+  return `<div class="kz-petals" aria-hidden="true">${_petalCache}</div>`;
 }
+
+const KANJI = "和 · 平和 · 力 · 栄誉";
+
+// screen 1 — the hero: raefet.png behind, a call to "Enter the village"
+function accueilView() {
+  return `
+  <div class="kz-corner-lang">${langBar()}</div>
+  <section class="kz-accueil">
+    <div class="kz-hero-bg"></div>
+    <div class="kz-hero-veil"></div>
+    <div class="kz-hero-content">
+      <div class="kz-kanji">${KANJI}</div>
+      <button class="kz-enter" data-act="enter-village">${t("enter_village")} →</button>
+    </div>
+  </section>`;
+}
+
+// screen 2 — the login / register scroll card
+function authView() {
+  const isReg = authTab === "register";
+  const sub = isReg ? t("auth_reg_sub") : t("auth_login_sub");
+  const btn = isReg ? t("signup_cta") : t("login_cta");
+  const switchText = isReg ? t("already_acct") : t("new_here");
+  const switchLink = isReg ? t("log_in") : t("create_acct");
+  const confirmField = isReg
+    ? `<input class="kz-field" id="acc-pass2" data-draft="pass2" type="password" maxlength="64" placeholder="${esc(t("confirm_pass"))}" autocomplete="new-password" value="${esc(authDraft.pass2 || "")}"/>`
+    : "";
+  return `
+  <div class="kz-corner-lang">${langBar()}</div>
+  <section class="kz-auth">
+    <div class="kz-auth-bg"></div>
+    <div class="kz-auth-veil"></div>
+    <div class="kz-auth-wrap">
+      <div class="kz-scroll-card">
+        <div class="kz-card-frame"></div>
+        <div class="kz-stamp">忍</div>
+        <div class="kz-vert">忠誠 · 勇気 · 戦之道</div>
+        <div class="kz-auth-body">
+          <div class="kz-kanji sm">${KANJI}</div>
+          <div class="kz-logo-wrap">
+            <div class="kz-sun"></div>
+            <h1 class="kz-logo">Kyuubi<span>Z</span></h1>
+          </div>
+          <div class="kz-brush"></div>
+          <p class="kz-auth-sub">${esc(sub)}</p>
+          <div class="kz-seg">
+            <button class="${!isReg ? "on" : ""}" data-act="auth-tab" data-tab="login">${t("log_in")}</button>
+            <button class="${isReg ? "on" : ""}" data-act="auth-tab" data-tab="register">${t("register")}</button>
+          </div>
+          <div class="kz-auth-form">
+            <input class="kz-field" id="acc-user" data-draft="user" maxlength="20" placeholder="${esc(t("username"))}" autocomplete="username" value="${esc(authDraft.user)}"/>
+            <input class="kz-field" id="acc-pass" data-draft="pass" type="password" maxlength="64" placeholder="${esc(t("password"))}" autocomplete="${isReg ? "new-password" : "current-password"}" value="${esc(authDraft.pass)}"/>
+            ${confirmField}
+            ${authError ? `<div class="form-err">${esc(authError)}</div>` : ""}
+            <button class="kz-submit" data-act="${isReg ? "do-register" : "do-login"}" ${authBusy ? "disabled" : ""}>${authBusy ? "…" : btn} →</button>
+          </div>
+          <p class="kz-auth-switch">${esc(switchText)} <a href="#" data-act="toggle-auth">${esc(switchLink)}</a></p>
+          <button class="kz-back" data-act="to-accueil">← ${esc(t("close"))}</button>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+// screen 3 — the games menu (shown once logged in)
+const CLOUD_SVG = `<svg class="kz-cloud" viewBox="0 0 100 70" fill="currentColor" aria-hidden="true"><path d="M30 55c-11 0-20-8-20-18 0-9 7-16 16-17 2-9 10-15 20-15 8 0 15 4 18 11 2-1 4-1 6-1 9 0 16 7 16 16s-7 16-16 16H30z"/></svg>`;
+function gameCardHTML(g) {
+  const pill = g.pill[lang] || g.pill.en;
+  const cta = g.ready ? `${t("play")} →` : `🔒 ${t("soon")}`;
+  const inner = `${CLOUD_SVG}
+    <div class="kz-game-head">
+      <span class="kz-game-ic">${g.emoji}</span>
+      <span class="kz-game-tag">${esc(pill)}</span>
+    </div>
+    <h3 class="kz-game-name">${g.name()}</h3>
+    <p class="kz-game-desc">${g.tag()}</p>
+    <span class="kz-game-cta ${g.ready ? "" : "soon"}">${cta}</span>`;
+  if (g.ready && account) return `<a class="kz-game" href="${g.href}">${inner}</a>`;
+  if (g.ready) return `<div class="kz-game" data-act="require-login">${inner}</div>`;
+  return `<div class="kz-game soon">${inner}</div>`;
+}
+function gamesView() {
+  const cards = GAMES.map(gameCardHTML).join("");
+  const more = `<div class="kz-more">
+    <span class="kz-more-ic">✧</span>
+    <span class="kz-more-t">${t("more")}</span>
+    <span class="kz-more-s">${t("more_soon")}</span>
+  </div>`;
+  return `
+  <div class="kz-games">
+    <div class="kz-games-top"></div>
+    <header class="kz-header">
+      <div class="kz-logo sm">🦊 Kyuubi<span>Z</span></div>
+      <div class="kz-nav">${langBar()}${lbButton()}${accountChip()}</div>
+    </header>
+    <main class="kz-main">
+      <div class="kz-main-head">
+        <div>
+          <div class="kz-kanji sm">${KANJI}</div>
+          <h1 class="kz-title">${t("choose_game")}</h1>
+          <p class="kz-title-sub">${t("tagline")}</p>
+        </div>
+        <span class="kz-yokai">妖怪</span>
+      </div>
+      <div class="kz-grid">${cards}${more}</div>
+      <p class="kz-foot">${t("foot")} · KyuubiZ</p>
+    </main>
+  </div>`;
+}
+
 
 function modal(inner, title) {
   return `<div class="modal-backdrop" data-act="close-modal">
@@ -359,29 +574,15 @@ function modal(inner, title) {
     </div>
   </div>`;
 }
-function authModal() {
-  const isLogin = authTab === "login";
-  return modal(
-    `<div class="tabs" style="justify-content:center;margin-bottom:12px">
-      <button class="${isLogin ? "on" : ""}" data-act="auth-tab" data-tab="login">${t("log_in")}</button>
-      <button class="${!isLogin ? "on" : ""}" data-act="auth-tab" data-tab="register">${t("sign_up")}</button>
-    </div>
-    <label class="field">${t("username")}
-      <input class="input" id="acc-user" data-draft="user" maxlength="20" autocomplete="username" value="${esc(authDraft.user)}" />
-    </label>
-    <label class="field" style="margin-top:10px">${t("password")}
-      <input class="input" id="acc-pass" data-draft="pass" type="password" maxlength="64" autocomplete="${isLogin ? "current-password" : "new-password"}" value="${esc(authDraft.pass)}" />
-    </label>
-    ${authError ? `<div class="form-err">${esc(authError)}</div>` : ""}
-    <button class="btn ${isLogin ? "btn-cyan" : "btn-pink"} block lg" style="margin-top:14px" data-act="${isLogin ? "do-login" : "do-register"}" ${authBusy ? "disabled" : ""}>
-      ${authBusy ? "…" : isLogin ? t("login_cta") : t("signup_cta")}</button>`,
-    t("account")
-  );
-}
 function profileModal() {
   const a = account;
   if (!a) return "";
   const pct = Math.round((a.intoLevel / a.levelSpan) * 100);
+  const rk = a.rank;
+  const rankPct = rk && rk.spanXp ? Math.round((rk.intoXp / rk.spanXp) * 100) : 100;
+  const rankFoot = rk && rk.spanXp
+    ? `${rk.intoXp}/${rk.spanXp} XP ${rtxt("next_rank")}`
+    : rtxt("top_rank");
   const st = a.stats || {};
   const achs = ACH.map((x) => {
     const got = (a.achievements || []).includes(x.id);
@@ -400,6 +601,17 @@ function profileModal() {
         <div class="prof-lvl">${t("level", { n: a.level })} · ${a.xp} XP · 🪙 ${a.coins || 0}</div>
       </div>
     </div>
+    ${rk ? `<div class="rank-show" style="--rank:${esc(rk.color)}">
+      <div class="rank-show-top">
+        <span class="rank-emoji">${rk.icon}</span>
+        <div class="rank-show-txt">
+          <div class="rank-show-lbl">${rtxt("rank")}</div>
+          <div class="rank-show-name">${esc(rankLabel(rk))}</div>
+        </div>
+      </div>
+      <div class="rank-bar"><div class="rank-fill" style="width:${rankPct}%"></div></div>
+      <div class="count-hint" style="text-align:center;margin-top:4px">${esc(rankFoot)}</div>
+    </div>` : ""}
     <div class="xp-bar"><div class="xp-fill" style="width:${pct}%"></div></div>
     <div class="count-hint" style="text-align:center;margin-top:4px">${a.intoLevel}/${a.levelSpan} → ${t("level", { n: a.level + 1 })}</div>
     <div class="stat-row">
@@ -420,29 +632,21 @@ function profileModal() {
 
 /* ---------------- render ---------------- */
 function render() {
-  const cards = GAMES.map(cardHTML).join("");
-  const placeholder = `<div class="game-card placeholder" style="--accent:var(--violet);animation-delay:${(GAMES.length * 0.12).toFixed(2)}s">
-      <div class="gc-emoji">✨</div><div class="gc-tag">${t("more")}</div></div>`;
-  const overlay = modalKind === "auth" ? authModal() : modalKind === "profile" ? profileModal() : modalKind === "leaderboard" ? leaderboardModal() : "";
-
-  $home.innerHTML = `
-    <div class="home-top">
-      <span class="home-sub">🦊 KYUUBI</span>
-      <div class="top-right">${langBar()}${lbButton()}${accountChip()}</div>
-    </div>
-    <div class="hero-wrap">
-      <div class="kyuubi-mark">🦊</div>
-      <h1 class="home-brand">KYUUBI</h1>
-      <p class="home-tagline">${t("tagline")}</p>
-      <p class="home-sub">${t("sub")}</p>
-      <div class="scroll-hint" id="scrollHint">⌄</div>
-    </div>
-    <div class="games-title">${t("games")}</div>
-    <div class="games-grid">${cards}${placeholder}</div>
-    <div class="home-foot">${account ? "" : t("guest_hint") + " · "}${t("foot")}</div>
-    ${overlay}`;
-  attachTilt();
+  let body;
+  if (view === "games") body = gamesView();
+  else if (view === "auth") body = authView();
+  else body = accueilView();
+  $home.innerHTML = petalsHTML() + body + overlayHTML();
 }
+
+function overlayHTML() {
+  return modalKind === "profile"
+    ? profileModal()
+    : modalKind === "leaderboard"
+    ? leaderboardModal()
+    : "";
+}
+
 
 /* ---------------- events ---------------- */
 $home.addEventListener("click", async (e) => {
@@ -466,8 +670,17 @@ $home.addEventListener("keydown", (e) => {
 async function onAct(act, el) {
   switch (act) {
     case "noop": break;
+    case "enter-village":
+      // From the hero: members go straight to the games menu, guests to sign-in.
+      if (account) { view = "games"; render(); window.scrollTo(0, 0); }
+      else { view = "auth"; authTab = "login"; authError = ""; render(); focusUser(); }
+      break;
+    case "to-accueil": view = "accueil"; authError = ""; render(); window.scrollTo(0, 0); break;
     case "open-auth":
-    case "require-login": modalKind = "auth"; authTab = "login"; authError = ""; render(); focusUser(); break;
+    case "require-login":
+      view = "auth"; authTab = "login"; authError = ""; render(); focusUser(); break;
+    case "toggle-auth":
+      authTab = authTab === "login" ? "register" : "login"; authError = ""; render(); focusUser(); break;
     case "open-profile": modalKind = "profile"; render(); break;
     case "open-leaderboard": modalKind = "leaderboard"; lbMode = "versus"; lbData = null; render(); fetchLeaderboard(); break;
     case "lb-tab": {
@@ -492,8 +705,10 @@ function errText(code) {
 async function doAuth(kind) {
   const u = (document.getElementById("acc-user")?.value || "").trim();
   const p = document.getElementById("acc-pass")?.value || "";
-  authDraft = { user: u, pass: p };
+  const p2 = document.getElementById("acc-pass2")?.value || "";
+  authDraft = { user: u, pass: p, pass2: p2 };
   if (!u || !p) { authError = t("err_fill"); render(); focusUser(); return; }
+  if (kind === "register" && p2 !== p) { authError = t("err_pass_match"); render(); focusUser(); return; }
   authBusy = true; authError = ""; render();
   const res = kind === "login" ? await apiPost("/api/login", { username: u, password: p }) : await apiPost("/api/register", { username: u, password: p });
   authBusy = false;
@@ -501,8 +716,10 @@ async function doAuth(kind) {
     saveToken(res.token);
     account = res.profile;
     modalKind = null;
-    authDraft = { user: "", pass: "" };
+    authDraft = { user: "", pass: "", pass2: "" };
+    view = "games"; // step through the village gate
     render();
+    window.scrollTo(0, 0);
   } else {
     authError = errText(res && res.error);
     render();
@@ -515,78 +732,17 @@ async function doLogout() {
   clearToken();
   account = null;
   modalKind = null;
+  view = "accueil"; // back to the gate
   render();
+  window.scrollTo(0, 0);
 }
-
-/* ---------------- 3D tilt ---------------- */
-function attachTilt() {
-  if (!canHover || reduceMotion) return;
-  document.querySelectorAll(".game-card.ready").forEach((card) => {
-    card.addEventListener("pointermove", (e) => {
-      const r = card.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      card.style.setProperty("--ry", `${(px * 10).toFixed(2)}deg`);
-      card.style.setProperty("--rx", `${(-py * 10).toFixed(2)}deg`);
-    });
-    card.addEventListener("pointerleave", () => {
-      card.style.setProperty("--ry", "0deg");
-      card.style.setProperty("--rx", "0deg");
-    });
-  });
-}
-
-/* ---------------- drifting star canvas ---------------- */
-(function stars() {
-  if (reduceMotion) return;
-  const canvas = document.getElementById("stars");
-  if (!canvas) return;
-  const g = canvas.getContext("2d");
-  let w, h, dpr, pts;
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = canvas.width = window.innerWidth * dpr;
-    h = canvas.height = window.innerHeight * dpr;
-    const n = Math.min(90, Math.floor((window.innerWidth * window.innerHeight) / 22000));
-    pts = Array.from({ length: n }, () => ({
-      x: Math.random() * w, y: Math.random() * h,
-      r: (Math.random() * 1.6 + 0.4) * dpr, s: (Math.random() * 0.3 + 0.05) * dpr,
-      a: Math.random() * 0.5 + 0.2, tw: Math.random() * 0.02 + 0.005, p: Math.random() * Math.PI * 2,
-    }));
-  }
-  const COLORS = ["255,61,119", "34,224,214", "255,197,61", "139,92,246"];
-  function frame() {
-    g.clearRect(0, 0, w, h);
-    for (const p of pts) {
-      p.y -= p.s; p.p += p.tw;
-      if (p.y < -4) { p.y = h + 4; p.x = Math.random() * w; }
-      const alpha = p.a * (0.6 + 0.4 * Math.sin(p.p));
-      g.beginPath();
-      g.fillStyle = `rgba(${COLORS[(p.x | 0) % COLORS.length]},${alpha})`;
-      g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      g.fill();
-    }
-    requestAnimationFrame(frame);
-  }
-  window.addEventListener("resize", resize);
-  resize();
-  requestAnimationFrame(frame);
-})();
-
-/* ---------------- background: static image + scroll hint ---------------- */
-(function bgScroll() {
-  window.addEventListener("scroll", () => {
-    const hint = document.getElementById("scrollHint");
-    if (hint) hint.classList.toggle("hide", (window.scrollY || 0) > 40);
-  }, { passive: true });
-})();
 
 /* ---------------- boot ---------------- */
 (async function initAccount() {
   const tok = getToken();
   if (tok) {
     const p = await apiMe(tok);
-    if (p) { account = p; render(); }
+    if (p) { account = p; view = "games"; render(); }
     else clearToken();
   }
 })();

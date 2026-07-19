@@ -1,0 +1,302 @@
+/* KYUUBI QUEENS — game skin, built on the shared SPILL/KYUUBI design tokens */
+
+.q-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 16px 6px;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+.q-logo {
+  font-family: var(--display);
+  letter-spacing: 1px;
+  font-size: 18px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+html[lang="ar"] .q-logo,
+html[lang="ar"] .q-brand,
+html[lang="ar"] .q-h2,
+html[lang="ar"] .q-h3 {
+  font-family: "Cairo", "Segoe UI", Tahoma, sans-serif;
+  font-weight: 900;
+}
+
+.q-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px 16px 60px;
+}
+.q-wrap-narrow {
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px 16px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- hero / landing ---------- */
+.q-hero {
+  text-align: center;
+  padding: 8vh 12px 4vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.q-emoji {
+  font-size: 64px;
+  filter: drop-shadow(0 8px 22px rgba(251, 191, 36, 0.5));
+  animation: q-bob 4s ease-in-out infinite;
+}
+@keyframes q-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.q-brand {
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: clamp(38px, 10vw, 80px);
+  line-height: 0.95;
+  background: linear-gradient(100deg, var(--gold, #FFC53D), var(--pink, #FF3D77) 55%, var(--violet, #8B5CF6));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: q-sheen 6s linear infinite;
+}
+@keyframes q-sheen { to { background-position: 200% center; } }
+.q-tagline {
+  color: var(--muted);
+  max-width: 36ch;
+  font-size: clamp(15px, 3.4vw, 18px);
+}
+.q-cta-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+/* ---------- buttons / inputs ---------- */
+.q-btn {
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 13px 26px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--panel-2);
+  transition: transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s;
+}
+.q-btn:hover { transform: translateY(-2px); }
+.q-btn:active { transform: translateY(0); }
+.q-btn.primary {
+  color: #1a1204;
+  background: linear-gradient(120deg, var(--gold, #FFC53D), #FB923C);
+  box-shadow: 0 8px 26px rgba(251, 146, 60, 0.35);
+}
+.q-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.q-btn.full { width: 100%; margin-top: 12px; }
+
+.q-link {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 8px 2px;
+}
+.q-link:hover { color: var(--text); }
+.q-link.danger:hover { color: var(--red); }
+
+.q-input,
+.q-select {
+  width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--ink-2);
+  color: var(--text);
+  padding: 12px 14px;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.q-label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0 5px;
+}
+
+/* ---------- cards ---------- */
+.q-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md, 16px);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.q-form { max-width: 420px; margin: 4vh auto 0; }
+.q-h2 { font-family: var(--display); font-size: 26px; margin: 4px 0 6px; }
+.q-h3 { font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: var(--text); margin-bottom: 10px; }
+.q-center { text-align: center; }
+.q-muted { color: var(--muted); font-size: 14px; }
+.q-hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.q-howto { text-align: center; color: var(--muted); font-size: 13px; margin: 8px 0; }
+
+/* color dots */
+.q-colors { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px; }
+.q-dot {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.q-dot.on { border-color: var(--text); transform: scale(1.12); }
+
+/* ---------- lobby ---------- */
+.q-lobby { display: flex; flex-direction: column; }
+.q-code-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.q-code {
+  font-family: var(--display);
+  font-size: 34px;
+  letter-spacing: 4px;
+  color: var(--gold, #FFC53D);
+}
+.q-qr { width: 92px; height: 92px; border-radius: 10px; background: #fff; padding: 5px; }
+
+.q-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.q-team {
+  text-align: start;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--ink-2);
+  border-left: 5px solid var(--tc);
+  transition: transform 0.12s ease, box-shadow 0.2s;
+  cursor: pointer;
+}
+.q-team.mine { box-shadow: 0 0 0 2px var(--tc) inset; }
+.q-team-name { font-weight: 700; color: var(--tc); margin-bottom: 6px; }
+.q-team-members { display: flex; flex-wrap: wrap; gap: 5px; }
+.q-chip {
+  font-size: 12px; padding: 3px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--pc) 22%, transparent);
+  border: 1px solid var(--pc); color: var(--text);
+}
+.q-empty { color: var(--muted); }
+.q-set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.q-set-row .q-label { margin: 0; }
+.q-set-row .q-select { max-width: 55%; margin: 0; }
+
+/* ---------- play: HUD ---------- */
+.q-play { display: flex; flex-direction: column; gap: 12px; }
+.q-hud {
+  display: flex; gap: 8px; justify-content: space-between;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: 10px 14px;
+}
+.q-hud-item { display: flex; flex-direction: column; gap: 2px; align-items: center; flex: 1; }
+.q-hud-k { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.q-hud-v { font-weight: 800; font-size: 16px; }
+
+.q-pips { display: flex; gap: 4px; margin-top: 3px; }
+.q-pip { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.q-pip.cur { background: var(--gold, #FFC53D); box-shadow: 0 0 6px var(--gold, #FFC53D); }
+.q-pip.on { background: var(--green, #4ADE80); }
+
+/* ---------- board ---------- */
+.q-board {
+  display: grid;
+  gap: 0;
+  width: min(94vw, 560px);
+  margin: 2px auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  touch-action: manipulation;
+}
+.q-cell {
+  position: relative;
+  border: 0.5px solid rgba(0, 0, 0, 0.28);
+  background: color-mix(in srgb, var(--rc) 58%, #10101f);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; cursor: pointer;
+  transition: filter 0.1s ease;
+  aspect-ratio: 1 / 1;
+}
+.q-cell:active { filter: brightness(1.2); }
+/* thick region boundaries */
+.q-cell.rt { border-top: 2.5px solid rgba(8, 6, 13, 0.92); }
+.q-cell.rb { border-bottom: 2.5px solid rgba(8, 6, 13, 0.92); }
+.q-cell.rl { border-left: 2.5px solid rgba(8, 6, 13, 0.92); }
+.q-cell.rr { border-right: 2.5px solid rgba(8, 6, 13, 0.92); }
+.q-glyph { font-size: clamp(16px, 5.4vw, 30px); line-height: 1; user-select: none; }
+.q-cell .q-glyph { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.q-cell.bad {
+  background: color-mix(in srgb, var(--rc) 40%, #ff2d55);
+  animation: q-shake 0.3s;
+}
+.q-cell.bad .q-glyph { filter: drop-shadow(0 0 6px #ff2d55); }
+@keyframes q-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-2px)} 75%{transform:translateX(2px)} }
+
+.q-solvedbig { font-size: 22px; font-weight: 800; color: var(--tc); }
+.q-solvedbig .q-muted { margin-top: 6px; font-weight: 400; }
+
+/* solo hint bar */
+.q-hintbar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--ink-2); border: 1px solid var(--line-strong);
+  border-radius: 12px; padding: 8px 12px;
+}
+.q-hintbar-txt { color: var(--muted); font-size: 14px; }
+.q-hintbar-btn {
+  border: none; border-radius: 999px; padding: 8px 16px;
+  font-weight: 700; color: #1a1204;
+  background: linear-gradient(120deg, var(--gold, #FFC53D), #FB923C);
+}
+
+/* ---------- progress ---------- */
+.q-progress { display: flex; flex-direction: column; gap: 8px; }
+.q-prow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--tc); border-radius: 10px; padding: 8px 12px;
+}
+.q-prow.me { box-shadow: 0 0 0 1px var(--tc) inset; }
+.q-pname { flex: 0 0 auto; font-weight: 600; font-size: 14px; min-width: 90px; }
+.q-solved { color: var(--tc); }
+.q-pbar { flex: 1; height: 8px; border-radius: 6px; background: var(--ink-2); overflow: hidden; }
+.q-pbar > span { display: block; height: 100%; background: var(--tc); border-radius: 6px; transition: width 0.3s ease; }
+.q-badge { flex: 1; color: var(--green, #4ADE80); font-weight: 800; text-align: center; }
+.q-times { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
+.q-rt { font-size: 11px; color: var(--muted); background: var(--ink-2); border-radius: 6px; padding: 1px 6px; }
+.q-rt.dnf { opacity: 0.5; }
+
+.q-hostbar { display: flex; gap: 16px; justify-content: center; margin-top: 4px; }
+
+/* ---------- finished ---------- */
+.q-champ { padding: 26px 16px; border-top: 4px solid var(--tc); }
+.q-trophy.big { font-size: 60px; }
+.q-champ-label { text-transform: uppercase; letter-spacing: 2px; color: var(--muted); font-size: 13px; margin-top: 6px; }
+.q-champ-team { font-family: var(--display); font-size: 34px; margin-top: 2px; }
+.q-final-list { display: flex; flex-direction: column; gap: 8px; }
+.q-finalrow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--ink-2); border-radius: 10px; padding: 8px 12px;
+}
+.q-rank { font-weight: 800; color: var(--muted); width: 18px; }
+.q-swatch { width: 14px; height: 14px; border-radius: 4px; background: var(--tc); }
+.q-winname { flex: 1; font-weight: 700; }
+.q-winstat { color: var(--muted); font-size: 13px; }
+
+/* RTL: region borders + times align */
+html[dir="rtl"] .q-times { justify-content: flex-start; }

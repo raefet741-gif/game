@@ -29,6 +29,69 @@ export function levelFromXp(xp) {
   return Math.floor((xp || 0) / XP_PER_LEVEL) + 1;
 }
 
+// ---- Ranked ladder (Valorant-style) --------------------------------------
+// A cosmetic competitive rank derived purely from lifetime XP — there is no
+// stored rank state, so every existing account gets one for free and the whole
+// ladder can be retuned just by editing this table. Eight tiers of three
+// divisions each, then a single capstone tier (Radiant, no divisions).
+export const RANK_TIERS = [
+  { id: "iron",      icon: "🔩", color: "#7c8591" },
+  { id: "bronze",    icon: "🥉", color: "#b3763f" },
+  { id: "silver",    icon: "🥈", color: "#c2cad6" },
+  { id: "gold",      icon: "🥇", color: "#f4c430" },
+  { id: "platinum",  icon: "💠", color: "#3fd0c9" },
+  { id: "diamond",   icon: "💎", color: "#9b7bff" },
+  { id: "ascendant", icon: "🛡️", color: "#31c46b" },
+  { id: "immortal",  icon: "👹", color: "#e0416a" },
+  { id: "radiant",   icon: "🌟", color: "#fff2a8" },
+];
+
+// Flatten tiers into divisions with cumulative XP floors. Each division inside
+// tier T costs (T+1)*100 XP, so the climb gets steeper the higher you go:
+// Iron divisions are 100 XP apart, Immortal divisions 800 XP apart. Radiant is
+// a single rank sitting above Immortal 3.
+const RANK_LADDER = (() => {
+  const out = [];
+  let floor = 0;
+  RANK_TIERS.forEach((tier, ti) => {
+    if (tier.id === "radiant") {
+      out.push({ tier: tier.id, division: 0, icon: tier.icon, color: tier.color, minXp: floor });
+      return;
+    }
+    const step = (ti + 1) * 100;
+    for (let d = 1; d <= 3; d++) {
+      out.push({ tier: tier.id, division: d, icon: tier.icon, color: tier.color, minXp: floor });
+      floor += step;
+    }
+  });
+  return out;
+})();
+
+// Resolve lifetime XP to a rank: tier + division (1–3, or 0 for Radiant), the
+// tier icon/color, a global index for sorting, and progress toward the next
+// division (spanXp/nextXp are null at Radiant, the top of the ladder).
+export function rankFromXp(xp) {
+  const x = Math.max(0, Math.floor(xp || 0));
+  let idx = 0;
+  for (let i = 0; i < RANK_LADDER.length; i++) {
+    if (x >= RANK_LADDER[i].minXp) idx = i;
+    else break;
+  }
+  const cur = RANK_LADDER[idx];
+  const next = RANK_LADDER[idx + 1] || null;
+  return {
+    tier: cur.tier,
+    division: cur.division,
+    icon: cur.icon,
+    color: cur.color,
+    index: idx,
+    minXp: cur.minXp,
+    nextXp: next ? next.minXp : null,
+    intoXp: x - cur.minXp,
+    spanXp: next ? next.minXp - cur.minXp : null,
+  };
+}
+
 // Per-mode stats let us rank players two ways: "versus" (games against other
 // people) and "solo" (playing alone against the clock). Every account carries
 // both buckets; older accounts are upgraded lazily by ensureModes().
@@ -57,6 +120,45 @@ function ensureModes(user) {
 // Normalize a mode string to one of our two buckets ("versus" is the default).
 function modeKey(mode) {
   return mode === "solo" ? "solo" : "versus";
+}
+
+// ---- Per-game ranked ladder ------------------------------------------------
+// Every competitive game keeps its OWN leaderboard, scored with a zero-sum
+// point system: when sides play against each other the winning side gains
+// RANKED_DELTA points and the losing side loses the same amount (floored at 0
+// so nobody goes negative). A Sudoku ace and a Draw ace are ranked separately.
+// Solo play never touches these boards — there's no opponent to win from.
+export const RANKED_GAMES = [
+  "spill", "memory", "sudoku", "puzzle", "words", "draw", "zip", "queens",
+];
+const RANKED_SET = new Set(RANKED_GAMES);
+export const RANKED_DELTA = 18; // points won by the winner / lost by the loser
+
+function emptyRankedBucket() {
+  return { points: 0, wins: 0, losses: 0, games: 0 };
+}
+// Lazily ensure the per-game map exists (older accounts predate it).
+function ensureRanked(user) {
+  if (!user.ranked || typeof user.ranked !== "object") user.ranked = {};
+  return user.ranked;
+}
+function rankedBucket(user, game) {
+  const r = ensureRanked(user);
+  if (!r[game]) r[game] = emptyRankedBucket();
+  return r[game];
+}
+// Apply one game result to a game's ranked board. Winner +delta, loser -delta.
+function applyRanked(user, game, won) {
+  if (!game || !RANKED_SET.has(game)) return;
+  const b = rankedBucket(user, game);
+  b.games += 1;
+  if (won) {
+    b.wins += 1;
+    b.points += RANKED_DELTA;
+  } else {
+    b.losses += 1;
+    b.points = Math.max(0, b.points - RANKED_DELTA);
+  }
 }
 
 function hashPassword(password, salt) {
@@ -93,10 +195,12 @@ export function publicProfile(user) {
     xp,
     coins: user.coins || 0,
     level: levelFromXp(xp),
+    rank: rankFromXp(xp),
     intoLevel: xp % XP_PER_LEVEL,
     levelSpan: XP_PER_LEVEL,
     stats: user.stats || { gamesPlayed: 0, wins: 0, biggestRoom: 0 },
     modes: ensureModes(user),
+    ranked: ensureRanked(user),
     achievements: user.achievements || [],
   };
 }
@@ -199,15 +303,44 @@ export function leaderboard(mode = "overall", limit = 100) {
       xp: r.xp,
       coins: r.u.coins || 0,
       level: levelFromXp(r.u.xp || 0),
+      rank: rankFromXp(r.u.xp || 0),
       wins: r.wins,
       gamesPlayed: r.games,
+    }));
+}
+
+// Per-game leaderboard: rank everyone who has played `game` by that game's
+// ranked points (then wins, then fewest losses). Each game has its own board.
+export function gameLeaderboard(game, limit = 100) {
+  if (!RANKED_SET.has(game)) return [];
+  const db = getDB();
+  return Object.values(db.users)
+    .map((u) => ({ u, b: ensureRanked(u)[game] }))
+    .filter((x) => x.b && (x.b.games > 0 || x.b.points > 0))
+    .sort(
+      (a, b) =>
+        b.b.points - a.b.points ||
+        b.b.wins - a.b.wins ||
+        a.b.losses - b.b.losses
+    )
+    .slice(0, limit)
+    .map((x, i) => ({
+      rank: i + 1,
+      name: x.u.name,
+      color: x.u.color,
+      points: x.b.points,
+      wins: x.b.wins,
+      losses: x.b.losses,
+      games: x.b.games,
+      level: levelFromXp(x.u.xp || 0),
+      tier: rankFromXp(x.u.xp || 0),
     }));
 }
 
 // Grant XP + coins to a single logged-in user (used by team games like Sudoku).
 // Updates lifetime stats and re-checks shared achievements. Returns the reward
 // summary + fresh profile so the caller can notify that player's socket.
-export function grantReward(userId, { xpGain = 0, coinGain = 0, won = false, played = true, mode = "versus" } = {}) {
+export function grantReward(userId, { xpGain = 0, coinGain = 0, won = false, played = true, mode = "versus", game = null } = {}) {
   const db = getDB();
   const user = db.users[userId];
   if (!user) return null;
@@ -224,6 +357,9 @@ export function grantReward(userId, { xpGain = 0, coinGain = 0, won = false, pla
   if (played) bucket.games += 1;
   if (won) bucket.wins += 1;
   bucket.xp += xpAdd;
+
+  // Per-game ranked points — only for versus play (a real opponent to win from).
+  if (played && modeKey(mode) === "versus") applyRanked(user, game, won);
 
   const unlocked = [];
   const check = (id, cond) => { if (cond && unlock(user, id)) unlocked.push(id); };
@@ -278,6 +414,9 @@ export function awardGameResults(room) {
     bucket.games += 1;
     if (won) bucket.wins += 1;
     bucket.xp += gain;
+
+    // SPILL's own ranked board: winner +18, everyone else -18.
+    applyRanked(user, "spill", won);
 
     const unlocked = [];
     const check = (id, cond) => { if (cond && unlock(user, id)) unlocked.push(id); };

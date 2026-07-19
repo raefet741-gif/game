@@ -13,7 +13,7 @@
 
 /* ---------- shared bits ---------- */
 .dd-brand {
-  font-family: "Anton", sans-serif;
+  font-family: var(--display);
   letter-spacing: 1px;
   font-size: clamp(30px, 8vw, 52px);
   line-height: 1;
@@ -32,7 +32,7 @@
 }
 .dd-card {
   background: linear-gradient(180deg, var(--panel), var(--ink-2));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(26, 21, 18, 0.08);
   border-radius: 18px;
   padding: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
@@ -43,7 +43,7 @@
 .dd-center { justify-content: center; }
 .dd-muted { color: var(--muted); }
 .dd-title {
-  font-family: "Anton", sans-serif;
+  font-family: var(--display);
   font-size: 22px;
   letter-spacing: 0.5px;
 }
@@ -61,22 +61,22 @@
 .dd-field > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .dd-input {
   width: 100%; padding: 13px 14px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff; font-size: 16px; font-family: inherit;
+  background: rgba(26, 21, 18, 0.05); border: 1px solid rgba(26, 21, 18, 0.12);
+  color: var(--text); font-size: 16px; font-family: inherit;
 }
 .dd-input:focus { outline: none; border-color: var(--violet); }
 .dd-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .dd-swatch {
   width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; cursor: pointer;
 }
-.dd-swatch.on { border-color: #fff; transform: scale(1.08); }
+.dd-swatch.on { border-color: var(--ink); transform: scale(1.08); }
 
 /* ---------- lobby ---------- */
 .dd-code {
-  font-family: "Anton", sans-serif; font-size: 34px; letter-spacing: 4px;
+  font-family: var(--display); font-size: 34px; letter-spacing: 4px;
   color: var(--gold); text-align: center; cursor: pointer;
 }
-.dd-seg { display: flex; gap: 6px; background: rgba(0,0,0,0.25); padding: 5px; border-radius: 12px; flex-wrap: wrap; }
+.dd-seg { display: flex; gap: 6px; background: rgba(26,21,18,0.06); padding: 5px; border-radius: 12px; flex-wrap: wrap; }
 .dd-seg button {
   flex: 1; min-width: 70px; padding: 10px 8px; border: 0; border-radius: 8px;
   background: transparent; color: var(--muted); font-weight: 700; font-family: inherit;
@@ -88,20 +88,20 @@
 .dd-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .dd-team {
   border: 2px solid transparent; border-radius: 14px; padding: 10px; cursor: pointer;
-  background: rgba(255,255,255,0.04);
+  background: rgba(26,21,18,0.04);
 }
-.dd-team.mine { border-color: #fff; }
+.dd-team.mine { border-color: var(--ink); }
 .dd-team-hd { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 8px; }
 .dd-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
 .dd-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
-  background: rgba(255,255,255,0.06); font-size: 13px; margin: 3px;
+  background: rgba(26,21,18,0.06); font-size: 13px; margin: 3px;
 }
 
 .dd-players { display: flex; flex-direction: column; gap: 6px; }
-.dd-pl { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+.dd-pl { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(26,21,18,0.04); }
 .dd-pl .nm { font-weight: 600; }
-.dd-badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.1); color: var(--muted); }
+.dd-badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(26,21,18,0.1); color: var(--muted); }
 .dd-badge.host { background: var(--gold); color: #0d0d22; }
 .dd-badge.you { background: var(--cyan); color: #0d0d22; }
 .dd-badge.ok { background: var(--green); color: #0d0d22; }
@@ -109,17 +109,17 @@
 /* ---------- HUD ---------- */
 .dd-hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dd-prompt {
-  font-family: "Anton", sans-serif; font-size: clamp(24px, 7vw, 40px);
-  letter-spacing: 1px; text-align: center; color: #fff;
+  font-family: var(--display); font-size: clamp(24px, 7vw, 40px);
+  letter-spacing: 1px; text-align: center; color: var(--text);
 }
 .dd-prompt small { display: block; font-family: "Space Grotesk", sans-serif; font-size: 12px; letter-spacing: 2px; color: var(--muted); }
 .dd-timer {
-  font-family: "Anton", sans-serif; font-size: 26px; min-width: 64px; text-align: center;
-  padding: 4px 10px; border-radius: 12px; background: rgba(0,0,0,0.3);
+  font-family: var(--display); font-size: 26px; min-width: 64px; text-align: center;
+  padding: 4px 10px; border-radius: 12px; background: rgba(26,21,18,0.06);
 }
 .dd-timer.low { color: var(--pink); animation: dd-pulse 1s infinite; }
 @keyframes dd-pulse { 50% { opacity: 0.45; } }
-.dd-progress { height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+.dd-progress { height: 6px; background: rgba(26,21,18,0.1); border-radius: 4px; overflow: hidden; margin-top: 4px; }
 .dd-progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--violet), var(--cyan)); transition: width 0.3s linear; }
 
 /* ---------- canvas ---------- */
@@ -132,19 +132,19 @@
 .dd-tools { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .dd-pens { display: flex; gap: 6px; align-items: center; }
 .dd-pen {
-  width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); cursor: pointer;
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(26,21,18,0.25); cursor: pointer;
 }
-.dd-pen.on { border-color: #fff; transform: scale(1.12); box-shadow: 0 0 0 2px rgba(255,255,255,0.2); }
+.dd-pen.on { border-color: var(--ink); transform: scale(1.12); box-shadow: 0 0 0 2px rgba(26,21,18,0.2); }
 .dd-sizes { display: flex; gap: 6px; align-items: center; }
 .dd-size {
   display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
-  background: rgba(255,255,255,0.06); cursor: pointer; border: 2px solid transparent;
+  background: rgba(26,21,18,0.06); cursor: pointer; border: 2px solid transparent;
 }
 .dd-size.on { border-color: var(--violet); }
-.dd-size i { display: block; background: #fff; border-radius: 50%; }
+.dd-size i { display: block; background: var(--ink); border-radius: 50%; }
 .dd-tool-btn {
-  padding: 8px 12px; border-radius: 10px; border: 0; background: rgba(255,255,255,0.08);
-  color: #fff; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px;
+  padding: 8px 12px; border-radius: 10px; border: 0; background: rgba(26,21,18,0.08);
+  color: var(--text); font-weight: 700; cursor: pointer; font-family: inherit; font-size: 14px;
 }
 .dd-tool-btn:active { transform: scale(0.96); }
 
@@ -156,7 +156,7 @@
 }
 .dd-spinner {
   width: 42px; height: 42px; border-radius: 50%;
-  border: 4px solid rgba(255,255,255,0.15); border-top-color: var(--violet);
+  border: 4px solid rgba(26,21,18,0.15); border-top-color: var(--violet);
   margin: 14px auto; animation: dd-spin 0.9s linear infinite;
 }
 @keyframes dd-spin { to { transform: rotate(360deg); } }
@@ -174,12 +174,12 @@
 .dd-art-foot {
   display: flex; align-items: center; gap: 6px; justify-content: space-between;
   padding: 6px 8px; background: rgba(0,0,0,0.5); position: absolute; left: 0; right: 0; bottom: 0;
-  font-size: 12px; font-weight: 700;
+  font-size: 12px; font-weight: 700; color: #fff;
 }
-.dd-art-empty { display: grid; place-items: center; aspect-ratio: 4/3; color: #b9b9c9; font-size: 13px; }
+.dd-art-empty { display: grid; place-items: center; aspect-ratio: 4/3; color: var(--muted); font-size: 13px; }
 .dd-score-badge {
   position: absolute; top: 6px; right: 6px; background: var(--violet); color: #fff;
-  font-family: "Anton"; font-size: 18px; padding: 2px 8px; border-radius: 10px;
+  font-family: var(--display); font-size: 18px; padding: 2px 8px; border-radius: 10px;
 }
 .dd-vote-badge {
   position: absolute; top: 6px; right: 6px; background: var(--cyan); color: #0d0d22;
@@ -187,7 +187,7 @@
 }
 
 .dd-reveal-word {
-  text-align: center; font-family: "Anton"; font-size: clamp(26px, 8vw, 44px);
+  text-align: center; font-family: var(--display); font-size: clamp(26px, 8vw, 44px);
   color: var(--gold); margin: 4px 0 2px;
 }
 
@@ -202,8 +202,8 @@
 .dd-book-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 700; }
 .dd-chain { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
 .dd-page {
-  flex: none; width: 160px; scroll-snap-align: start; background: rgba(255,255,255,0.04);
-  border-radius: 12px; padding: 8px; border: 1px solid rgba(255,255,255,0.08);
+  flex: none; width: 160px; scroll-snap-align: start; background: rgba(26,21,18,0.04);
+  border-radius: 12px; padding: 8px; border: 1px solid rgba(26,21,18,0.08);
 }
 .dd-page.seed { border-color: var(--gold); }
 .dd-page.correct { border-color: var(--green); }
@@ -215,11 +215,11 @@
 
 /* ---------- scoreboard ---------- */
 .dd-standings { display: flex; flex-direction: column; gap: 8px; }
-.dd-stand-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+.dd-stand-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(26,21,18,0.04); }
 .dd-stand-row.first { background: linear-gradient(90deg, rgba(255,197,61,0.2), transparent); border: 1px solid rgba(255,197,61,0.4); }
-.dd-rank { font-family: "Anton"; font-size: 20px; width: 34px; text-align: center; }
+.dd-rank { font-family: var(--display); font-size: 20px; width: 34px; text-align: center; }
 .dd-stand-name { font-weight: 700; flex: 1; }
-.dd-stand-score { font-family: "Anton"; font-size: 20px; color: var(--gold); }
+.dd-stand-score { font-family: var(--display); font-size: 20px; color: var(--gold); }
 .dd-sub-members { font-size: 12px; color: var(--muted); }
 
 .dd-reward {
@@ -230,7 +230,7 @@
 .dd-sticky-actions { display: flex; gap: 10px; margin-top: 16px; }
 .dd-flash {
   position: fixed; left: 50%; top: 30%; transform: translateX(-50%);
-  font-family: "Anton"; font-size: 40px; pointer-events: none; z-index: 40;
+  font-family: var(--display); font-size: 40px; pointer-events: none; z-index: 40;
   animation: dd-flash 0.9s ease-out forwards;
 }
 @keyframes dd-flash { 0% { opacity: 0; transform: translateX(-50%) scale(0.6);} 20%{opacity:1;} 100% { opacity: 0; transform: translateX(-50%) scale(1.3) translateY(-20px);} }

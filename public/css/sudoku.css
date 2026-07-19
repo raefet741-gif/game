@@ -262,6 +262,35 @@ html[lang="ar"] .sdk-h3 {
 .sdk-cell.bad { color: var(--red); background: color-mix(in srgb, var(--red) 20%, var(--ink-2)); }
 .sdk-cell:not(.given):hover { background: color-mix(in srgb, var(--cyan) 12%, var(--ink-2)); }
 
+/* ---------- hint bar (solo) ---------- */
+.sdk-hintbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--green) 12%, var(--ink-2));
+  border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+}
+.sdk-hintbar-txt { font-size: 13.5px; color: var(--text); }
+.sdk-hintbar-btn {
+  border: none;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--green) 25%, var(--panel-2));
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 8px 16px;
+  white-space: nowrap;
+  transition: transform 0.1s, background 0.15s;
+}
+.sdk-hintbar-btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--green) 40%, var(--panel-2)); }
+.sdk-hintbar-btn:active { transform: translateY(0); }
+
 /* ---------- number pad ---------- */
 .sdk-pad {
   display: grid;

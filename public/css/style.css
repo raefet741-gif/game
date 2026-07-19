@@ -1,36 +1,44 @@
-/* SPILL — neon nightclub-arcade design system */
+/* KyuubiZ — Japanese ink-wash design system (shared by every page) */
+@import url("https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&display=swap");
 
 :root {
-  --ink: #0d0d22;
-  --ink-2: #14142e;
-  --panel: #1e1e3f;
-  --panel-2: #26264c;
-  --line: rgba(240, 238, 255, 0.1);
-  --line-strong: rgba(240, 238, 255, 0.18);
+  /* ink-wash paper palette — the whole app rides on these.
+     NOTE: --ink stays the DARK sumi colour (games use it for dark-on-bright
+     text & colour-mixes); page background & surfaces are the light paper. */
+  --paper: #efe8da;      /* page background (washi paper) */
+  --paper2: #faf6ee;
+  --ink: #1a1512;        /* sumi ink — dark text on bright, dark accents */
+  --ink-2: #f1ead9;      /* light card/input surface */
+  --panel: #faf6ee;      /* light card surface */
+  --panel-2: #efe6d4;    /* light raised surface */
+  --line: rgba(26, 21, 18, 0.12);
+  --line-strong: rgba(26, 21, 18, 0.24);
 
-  --pink: #ff3d77;
-  --cyan: #22e0d6;
-  --gold: #ffc53d;
-  --violet: #8b5cf6;
-  --green: #4ade80;
-  --red: #fb5a6a;
+  --pink: #c1272d;       /* sun red — the primary accent */
+  --pink2: #e0301f;
+  --cyan: #1f7a70;       /* deep teal, readable on paper */
+  --teal: #1f7a70;
+  --gold: #a9791f;       /* sumi gold */
+  --violet: #6d4aa8;
+  --purple: #6d4aa8;
+  --green: #3f8f4f;
+  --red: #c1272d;
 
-  --text: #f0eeff;
-  --muted: #9a9abf;
+  --text: #1a1512;       /* sumi ink */
+  --muted: #6b625c;
 
   --r-sm: 10px;
   --r: 16px;
   --r-lg: 22px;
   --r-pill: 999px;
 
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-  --glow-pink: 0 0 0 1px rgba(255, 61, 119, 0.4), 0 8px 30px rgba(255, 61, 119, 0.35);
-  --glow-cyan: 0 0 0 1px rgba(34, 224, 214, 0.4), 0 8px 30px rgba(34, 224, 214, 0.3);
-  --glow-gold: 0 0 0 1px rgba(255, 197, 61, 0.45), 0 8px 30px rgba(255, 197, 61, 0.3);
-  --glow-violet: 0 0 0 1px rgba(139, 92, 246, 0.45), 0 8px 30px rgba(139, 92, 246, 0.3);
+  --shadow: 0 24px 60px -30px rgba(26, 21, 18, 0.5);
+  --glow-pink: 0 0 0 1px rgba(193, 39, 45, 0.35), 0 10px 26px -10px rgba(193, 39, 45, 0.45);
+  --glow-cyan: 0 0 0 1px rgba(31, 122, 112, 0.35), 0 10px 26px -10px rgba(31, 122, 112, 0.4);
+  --glow-gold: 0 0 0 1px rgba(169, 121, 31, 0.4), 0 10px 26px -10px rgba(169, 121, 31, 0.4);
+  --glow-violet: 0 0 0 1px rgba(109, 74, 168, 0.4), 0 10px 26px -10px rgba(109, 74, 168, 0.4);
 
-  --display: "Anton", "Archivo Black", Impact, "Haettenschweiler",
-    "Arial Narrow Bold", sans-serif;
+  --display: "Shippori Mincho", "Cairo", "Times New Roman", serif;
   --body: "Space Grotesk", "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
     sans-serif;
 }
@@ -47,11 +55,12 @@ body {
 body {
   font-family: var(--body);
   color: var(--text);
-  background: var(--ink);
+  background: #efe8da;
+  /* faint sumi wash, fixed behind every screen */
   background-image:
-    radial-gradient(1100px 700px at 8% -10%, rgba(255, 61, 119, 0.16), transparent 55%),
-    radial-gradient(1000px 700px at 110% 0%, rgba(34, 224, 214, 0.14), transparent 55%),
-    radial-gradient(900px 800px at 50% 120%, rgba(139, 92, 246, 0.16), transparent 55%);
+    radial-gradient(1200px 700px at 8% -10%, rgba(193, 39, 45, 0.06), transparent 55%),
+    radial-gradient(1000px 700px at 110% 0%, rgba(26, 21, 18, 0.05), transparent 55%),
+    radial-gradient(900px 820px at 50% 120%, rgba(193, 39, 45, 0.05), transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -81,8 +90,8 @@ h3 {
 /* ---------- typography ---------- */
 .display {
   font-family: var(--display);
-  font-weight: 400;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
   line-height: 0.95;
   text-transform: uppercase;
 }
@@ -134,11 +143,11 @@ h3 {
   font-family: var(--display);
   text-transform: uppercase;
   letter-spacing: 2px;
-  background: linear-gradient(90deg, var(--pink), var(--gold), var(--cyan));
+  background: linear-gradient(90deg, var(--red), #7c1418 55%, var(--ink-soft, #1a1512));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 4px 20px rgba(255, 61, 119, 0.35));
+  filter: drop-shadow(0 4px 18px rgba(193, 39, 45, 0.25));
 }
 .hero .brand {
   font-size: clamp(64px, 20vw, 150px);
@@ -169,8 +178,8 @@ h3 {
   padding: 14px 20px;
   font-size: 16px;
   font-weight: 700;
-  color: var(--ink);
-  background: var(--text);
+  color: var(--paper2);
+  background: var(--ink);
   transition: transform 0.08s ease, box-shadow 0.18s ease, filter 0.18s ease,
     opacity 0.18s;
   display: inline-flex;
@@ -204,12 +213,12 @@ h3 {
 }
 .btn-cyan {
   background: var(--cyan);
-  color: #04211f;
+  color: #f4f0e6;
   box-shadow: var(--glow-cyan);
 }
 .btn-gold {
   background: var(--gold);
-  color: #2a1e00;
+  color: #fff;
   box-shadow: var(--glow-gold);
 }
 .btn-violet {
@@ -218,13 +227,13 @@ h3 {
   box-shadow: var(--glow-violet);
 }
 .btn-ghost {
-  background: rgba(240, 238, 255, 0.06);
+  background: rgba(26, 21, 18, 0.05);
   color: var(--text);
   border: 1px solid var(--line-strong);
   box-shadow: none;
 }
 .btn-ghost:hover {
-  background: rgba(240, 238, 255, 0.12);
+  background: rgba(26, 21, 18, 0.1);
 }
 .btn-danger {
   background: rgba(251, 90, 106, 0.14);
@@ -242,7 +251,7 @@ h3 {
   gap: 6px;
   padding: 6px 12px;
   border-radius: var(--r-pill);
-  background: rgba(240, 238, 255, 0.06);
+  background: rgba(26, 21, 18, 0.05);
   border: 1px solid var(--line);
   font-size: 13px;
   font-weight: 600;
@@ -303,7 +312,7 @@ label.field {
 .select,
 .textarea {
   width: 100%;
-  background: rgba(13, 13, 34, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   border: 1px solid var(--line-strong);
   color: var(--text);
   border-radius: var(--r-sm);
@@ -315,8 +324,8 @@ label.field {
 .input:focus,
 .select:focus,
 .textarea:focus {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(34, 224, 214, 0.18);
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(193, 39, 45, 0.16);
 }
 .input.code-input {
   font-family: var(--display);
@@ -368,7 +377,7 @@ label.field {
   width: 44px;
   height: 26px;
   border-radius: var(--r-pill);
-  background: rgba(240, 238, 255, 0.12);
+  background: rgba(26, 21, 18, 0.12);
   position: relative;
   transition: background 0.15s;
   flex: none;
@@ -394,7 +403,7 @@ label.field {
 /* segmented control */
 .seg {
   display: inline-flex;
-  background: rgba(13, 13, 34, 0.5);
+  background: rgba(255, 255, 255, 0.5);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-pill);
   padding: 4px;
@@ -559,7 +568,7 @@ label.field {
 }
 .timer-ring .track {
   fill: none;
-  stroke: rgba(240, 238, 255, 0.1);
+  stroke: rgba(26, 21, 18, 0.1);
   stroke-width: 12;
 }
 .timer-ring .value {
@@ -780,7 +789,7 @@ button.bluff-opt:hover {
 
 /* ---------- log feed ---------- */
 .feed {
-  background: rgba(13, 13, 34, 0.5);
+  background: rgba(255, 255, 255, 0.5);
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 10px 14px;
@@ -805,7 +814,7 @@ button.bluff-opt:hover {
 }
 .reaction-bar button {
   border: 1px solid var(--line);
-  background: rgba(240, 238, 255, 0.05);
+  background: rgba(26, 21, 18, 0.05);
   border-radius: var(--r-pill);
   font-size: 20px;
   width: 44px;
@@ -814,14 +823,14 @@ button.bluff-opt:hover {
   place-items: center;
 }
 .reaction-bar button:hover {
-  background: rgba(240, 238, 255, 0.12);
+  background: rgba(26, 21, 18, 0.12);
 }
 
 /* ---------- drawer (power shop) ---------- */
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 5, 16, 0.6);
+  background: rgba(26, 21, 18, 0.4);
   backdrop-filter: blur(4px);
   z-index: 40;
   display: flex;
@@ -860,7 +869,7 @@ button.bluff-opt:hover {
   border-radius: var(--r-pill);
 }
 .tabs button.on {
-  background: rgba(240, 238, 255, 0.1);
+  background: rgba(26, 21, 18, 0.1);
   color: var(--text);
 }
 
@@ -943,14 +952,14 @@ button.bluff-opt:hover {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: rgba(240, 238, 255, 0.04);
+  background: rgba(26, 21, 18, 0.04);
   text-align: left;
   width: 100%;
   color: var(--text);
 }
 .pick-row:hover {
   border-color: var(--line-strong);
-  background: rgba(240, 238, 255, 0.08);
+  background: rgba(26, 21, 18, 0.08);
 }
 .pick-row .score {
   margin-left: auto;
@@ -981,7 +990,7 @@ button.bluff-opt:hover {
   gap: 12px;
   padding: 10px;
   border-radius: var(--r);
-  background: rgba(240, 238, 255, 0.04);
+  background: rgba(26, 21, 18, 0.04);
   border: 1px solid var(--line);
 }
 .player-row .name {
@@ -1015,7 +1024,7 @@ button.bluff-opt:hover {
   gap: 8px;
   padding: 8px 10px;
   border-radius: var(--r-sm);
-  background: rgba(240, 238, 255, 0.04);
+  background: rgba(26, 21, 18, 0.04);
   border: 1px solid var(--line);
   font-size: 13px;
   cursor: pointer;
@@ -1083,7 +1092,7 @@ button.bluff-opt:hover {
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--r);
-  background: rgba(240, 238, 255, 0.04);
+  background: rgba(26, 21, 18, 0.04);
   border: 1px solid var(--line);
 }
 .lb-row.first {
@@ -1201,7 +1210,7 @@ button.bluff-opt:hover {
   top: 12px;
   inset-inline-start: 12px;
   z-index: 30;
-  background: rgba(13, 13, 34, 0.6);
+  background: rgba(255, 255, 255, 0.6);
   border: 1px solid var(--line-strong);
   color: var(--text);
   text-decoration: none;
@@ -1212,7 +1221,7 @@ button.bluff-opt:hover {
   backdrop-filter: blur(6px);
 }
 .home-back:hover {
-  background: rgba(240, 238, 255, 0.12);
+  background: rgba(26, 21, 18, 0.12);
 }
 
 /* ---------- misc ---------- */
@@ -1286,7 +1295,7 @@ button.bluff-opt:hover {
 }
 .langpill {
   border: 1px solid var(--line-strong);
-  background: rgba(240, 238, 255, 0.05);
+  background: rgba(26, 21, 18, 0.05);
   color: var(--muted);
   border-radius: var(--r-pill);
   padding: 6px 12px;

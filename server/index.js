@@ -25,6 +25,8 @@ import { attachMemoryIO, sweepMemoryRooms } from "./memory.js";
 import { attachSudokuIO, sweepSudokuRooms } from "./sudoku.js";
 import { attachWordsIO, sweepWordsRooms } from "./words.js";
 import { attachDrawIO, sweepDrawRooms } from "./draw.js";
+import { attachZipIO, sweepZipRooms } from "./zip.js";
+import { attachQueensIO, sweepQueensRooms } from "./queens.js";
 import {
   attachPuzzleIO,
   sweepPuzzleRooms,
@@ -42,8 +44,10 @@ import {
   profileFromToken,
   userFromToken,
   leaderboard,
+  gameLeaderboard,
   recordSoloWin,
   ACHIEVEMENTS,
+  RANKED_GAMES,
 } from "./accounts.js";
 
 await loadStore(); // may hit Postgres (DATABASE_URL) — await before serving
@@ -109,8 +113,15 @@ app.get("/api/me", (req, res) => {
   res.json({ ok: true, profile });
 });
 app.get("/api/achievements", (_req, res) => res.json({ achievements: ACHIEVEMENTS }));
-// ?mode=versus (against other people) | solo (alone) | overall (lifetime XP).
+// Two flavours of board:
+//   ?game=<id>  — that game's OWN ranked board (zero-sum win/loss points)
+//   ?mode=…     — cross-game XP board: versus | solo | overall (legacy)
 app.get("/api/leaderboard", (req, res) => {
+  const game = req.query.game ? String(req.query.game) : null;
+  if (game) {
+    if (!RANKED_GAMES.includes(game)) return res.status(400).json({ error: "unknown_game" });
+    return res.json({ game, players: gameLeaderboard(game, 100) });
+  }
   const mode = String(req.query.mode || "versus");
   res.json({ mode, players: leaderboard(mode, 100) });
 });
@@ -185,6 +196,8 @@ app.get(["/sudoku", "/sudoku/"], (_req, res) => res.sendFile(path.join(PUBLIC_DI
 app.get(["/puzzle", "/puzzle/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "puzzle.html")));
 app.get(["/words", "/words/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "words.html")));
 app.get(["/draw", "/draw/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "draw.html")));
+app.get(["/zip", "/zip/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "zip.html")));
+app.get(["/queens", "/queens/"], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, "queens.html")));
 
 app.use(express.static(PUBLIC_DIR));
 // Everything else falls back to the arcade home.
@@ -200,6 +213,8 @@ attachSudokuIO(io, SERVER_URL);
 attachPuzzleIO(io, SERVER_URL);
 attachWordsIO(io, SERVER_URL);
 attachDrawIO(io, SERVER_URL);
+attachZipIO(io, SERVER_URL);
+attachQueensIO(io, SERVER_URL);
 
 // ---- helpers ----
 function ctx(socket) {
@@ -473,6 +488,8 @@ setInterval(() => {
   sweepPuzzleRooms();
   sweepWordsRooms();
   sweepDrawRooms();
+  sweepZipRooms();
+  sweepQueensRooms();
 }, 60 * 1000);
 
 server.listen(PORT, "0.0.0.0", () => {
