@@ -226,6 +226,7 @@ let guessDraft = "";
 
 let renderedView = null;  // guards against wiping the canvas on every broadcast
 let phaseTick = null;
+let lastSliderInput = 0;  // timestamp of the last range-slider drag (lobby)
 
 /* ---------------- canvas model ---------------- */
 const CW = 800, CH = 600; // internal resolution (4:3)
@@ -374,11 +375,20 @@ function viewFor() {
 
 function reactToState() {
   const v = viewFor();
-  // Canvas views: render once, then soft-update HUD so the drawing survives.
-  const canvasView = v === "draw" || v === "relaydraw";
-  if (v === renderedView && (canvasView || v === "drawwait" || v === "relayguess" || v === "vote" || v === "lobby")) {
-    softUpdate(v);
-    return;
+  if (v === renderedView) {
+    // Lobby must fully re-render so setting changes (mode/judge/teams/…) show —
+    // except while a slider is being dragged, where a rebuild would break it.
+    if (v === "lobby") {
+      if (Date.now() - lastSliderInput < 600) softUpdate(v);
+      else fullRender();
+      return;
+    }
+    // Canvas & other timed views: soft-update so the drawing/input survives.
+    const canvasView = v === "draw" || v === "relaydraw";
+    if (canvasView || v === "drawwait" || v === "relayguess" || v === "vote") {
+      softUpdate(v);
+      return;
+    }
   }
   fullRender();
 }
@@ -932,6 +942,7 @@ $app.addEventListener("keydown", (e) => {
 });
 // Live-update the label next to a slider without a full re-render mid-drag.
 function liveSetting(key, val, inputEl) {
+  lastSliderInput = Date.now();
   const label = inputEl.previousElementSibling;
   if (label && label.querySelector("b")) label.querySelector("b").textContent = key === "drawSeconds" ? val + t("secs") : val;
   socket.emit("dd_settings", { [key]: val });
