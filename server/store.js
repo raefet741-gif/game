@@ -18,15 +18,26 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
-const DB_FILE = path.join(DATA_DIR, "kyuubi.json");
-const PG_URL = process.env.DATABASE_URL || "";
 const PG_KEY = "kyuubi"; // single-row key holding the whole DB blob
+
+// Config is resolved at loadStore() time, NOT at module-eval time: ESM imports
+// are hoisted and run before index.js calls loadEnv(), so reading process.env
+// here at the top would miss anything defined in .env (DATABASE_URL, DATA_DIR).
+let DATA_DIR = "";
+let DB_FILE = "";
+let PG_URL = "";
+let backend = "file";
+
+function resolveConfig() {
+  DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+  DB_FILE = path.join(DATA_DIR, "kyuubi.json");
+  PG_URL = process.env.DATABASE_URL || "";
+  backend = PG_URL ? "pg" : "file";
+}
 
 let db = { users: {}, byName: {}, sessions: {} };
 let saveTimer = null;
 let pool = null; // lazy pg pool
-let backend = PG_URL ? "pg" : "file";
 
 function normalize(parsed) {
   return {
@@ -39,6 +50,7 @@ function normalize(parsed) {
 // Load the DB once at startup. Async so the Postgres backend can await its query;
 // index.js should `await loadStore()` before serving.
 export async function loadStore() {
+  resolveConfig();
   if (backend === "pg") {
     try {
       await pgInit();
