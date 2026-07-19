@@ -734,7 +734,7 @@ async function doLogout() {
       x: Math.random() * w,
       y: fromTop ? -size * 2 - Math.random() * h * 0.3 : Math.random() * h,
       size,
-      vy: (0.5 + Math.random() * 1.4) * dpr,
+      vy: (0.28 + Math.random() * 0.8) * dpr,
       sway: (12 + Math.random() * 30) * dpr,
       swayPhase: Math.random() * Math.PI * 2,
       swaySpeed: 0.008 + Math.random() * 0.02,
