@@ -1,28 +1,29 @@
 // server/store.js
-// Persistent JSON store for accounts. Two interchangeable backends, chosen at
-// boot from the environment — accounts.js never has to know which is active:
+// Persistence for accounts. Two interchangeable backends, chosen at boot:
 //
-//   • FILE (default) — a single JSON file under server/data/. Perfect for local
-//     dev, BUT on an ephemeral host (Render/Koyeb/Fly free tiers) that folder is
-//     WIPED on every deploy/restart, so accounts would reset each push.
-//   • POSTGRES — set DATABASE_URL (Neon, Supabase, Render Postgres, …) and the
-//     whole DB is stored as one JSONB blob that survives deploys. This is what
-//     you want in production so players keep their XP / coins / logins.
+//   • FILE (default, local dev) — one JSON file under server/data/. Simple, but
+//     WIPED on every deploy/restart on ephemeral hosts (Render/Koyeb/Fly free).
+//   • POSTGRES (set DATABASE_URL — Neon, Supabase, …) — real, queryable tables
+//     that survive deploys:
+//        kyuubi_users     one row per account (readable columns + full profile)
+//        kyuubi_sessions  active login tokens
+//        kyuubi_leaderboard  a VIEW ranking users by XP (for easy dashboards)
 //
-// The in-memory `db` object stays the single source of truth at runtime; the
-// backend is only touched on boot (load) and via a debounced save, so every
-// getDB()/saveStore() caller stays synchronous exactly as before.
+// The in-memory `db` object stays the single source of truth at runtime, so
+// every getDB()/saveStore() caller in accounts.js stays synchronous. The backend
+// is only touched on boot (load) and via a debounced save that mirrors the whole
+// in-memory state into the tables. NOTE: the games' live rooms are deliberately
+// NOT persisted — they're transient sessions held in RAM.
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PG_KEY = "kyuubi"; // single-row key holding the whole DB blob
+const LEGACY_KEY = "kyuubi"; // old single-blob kv row, migrated on first load
 
-// Config is resolved at loadStore() time, NOT at module-eval time: ESM imports
-// are hoisted and run before index.js calls loadEnv(), so reading process.env
-// here at the top would miss anything defined in .env (DATABASE_URL, DATA_DIR).
+// Resolved at loadStore() time, NOT module-eval: ESM imports are hoisted and run
+// before index.js calls loadEnv(), so reading process.env here would miss .env.
 let DATA_DIR = "";
 let DB_FILE = "";
 let PG_URL = "";
@@ -46,22 +47,29 @@ function normalize(parsed) {
     sessions: (parsed && parsed.sessions) || {},
   };
 }
+// Rebuild the lowercase-username → id index from the users map (it isn't stored;
+// it's pure derived state).
+function rebuildByName() {
+  db.byName = {};
+  for (const u of Object.values(db.users)) {
+    const key = u.key || (u.name || "").toLowerCase();
+    if (key) db.byName[key] = u.id;
+  }
+}
+const levelOf = (xp) => Math.floor((xp || 0) / 100) + 1;
 
-// Load the DB once at startup. Async so the Postgres backend can await its query;
-// index.js should `await loadStore()` before serving.
+// ---------------------------------------------------------------------------
 export async function loadStore() {
   resolveConfig();
   if (backend === "pg") {
     try {
       await pgInit();
-      const { rows } = await pool.query("SELECT val FROM kv WHERE key = $1", [PG_KEY]);
-      if (rows[0] && rows[0].val) db = normalize(rows[0].val);
-      pruneSessions();
-      console.log("store: accounts loaded from Postgres (persistent).");
+      await loadFromPg();
+      console.log(
+        `store: accounts loaded from Postgres (persistent) — ${Object.keys(db.users).length} users.`
+      );
       return;
     } catch (e) {
-      // Never crash the server over storage — fall back to the file so the app
-      // still runs (data just won't persist until the DB is reachable again).
       console.error("store: Postgres load failed, using file fallback —", e.message);
       backend = "file";
     }
@@ -69,9 +77,10 @@ export async function loadStore() {
   try {
     if (fs.existsSync(DB_FILE)) {
       db = normalize(JSON.parse(fs.readFileSync(DB_FILE, "utf8")));
+      rebuildByName();
       pruneSessions();
     }
-    if (PG_URL) console.warn("store: DATABASE_URL set but Postgres unavailable — running on the ephemeral file store.");
+    if (PG_URL) console.warn("store: DATABASE_URL set but Postgres unavailable — on the ephemeral file store.");
   } catch (e) {
     console.error("store: load failed, starting fresh —", e.message);
   }
@@ -82,14 +91,69 @@ async function pgInit() {
   const { default: pg } = await import("pg");
   pool = new pg.Pool({
     connectionString: PG_URL,
-    // Hosted Postgres (Neon/Supabase/Render) requires SSL; set DATABASE_SSL=off
-    // for a plain local Postgres.
     ssl: process.env.DATABASE_SSL === "off" ? false : { rejectUnauthorized: false },
-    max: 3,
+    max: 4,
   });
-  await pool.query(
-    "CREATE TABLE IF NOT EXISTS kv (key text PRIMARY KEY, val jsonb NOT NULL, updated_at timestamptz DEFAULT now())"
-  );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS kyuubi_users (
+      id            text PRIMARY KEY,
+      username      text NOT NULL,
+      color         text,
+      xp            integer NOT NULL DEFAULT 0,
+      coins         integer NOT NULL DEFAULT 0,
+      level         integer NOT NULL DEFAULT 1,
+      games_played  integer NOT NULL DEFAULT 0,
+      wins          integer NOT NULL DEFAULT 0,
+      achievements  jsonb   NOT NULL DEFAULT '[]'::jsonb,
+      profile       jsonb   NOT NULL,
+      created_at    timestamptz DEFAULT now(),
+      updated_at    timestamptz DEFAULT now()
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS kyuubi_sessions (
+      token    text PRIMARY KEY,
+      user_id  text NOT NULL,
+      exp      bigint NOT NULL
+    )`);
+  await pool.query(`
+    CREATE OR REPLACE VIEW kyuubi_leaderboard AS
+      SELECT row_number() OVER (ORDER BY xp DESC, wins DESC) AS rank,
+             username, xp, coins, level, wins, games_played, updated_at
+      FROM kyuubi_users`);
+}
+
+async function loadFromPg() {
+  const users = await pool.query("SELECT profile FROM kyuubi_users");
+  db = { users: {}, byName: {}, sessions: {} };
+  for (const row of users.rows) {
+    const u = row.profile;
+    if (u && u.id) db.users[u.id] = u;
+  }
+  const sess = await pool.query("SELECT token, user_id, exp FROM kyuubi_sessions");
+  for (const row of sess.rows) {
+    db.sessions[row.token] = { userId: row.user_id, exp: Number(row.exp) };
+  }
+  rebuildByName();
+  pruneSessions();
+
+  // One-time migration: if the tables are empty but an old single-blob kv row
+  // exists (from the earlier store version), import it, then persist into tables.
+  if (Object.keys(db.users).length === 0) {
+    try {
+      const legacy = await pool.query("SELECT val FROM kv WHERE key = $1", [LEGACY_KEY]);
+      if (legacy.rows[0] && legacy.rows[0].val) {
+        db = normalize(legacy.rows[0].val);
+        rebuildByName();
+        pruneSessions();
+        if (Object.keys(db.users).length) {
+          console.log("store: migrated legacy kv blob → tables.");
+          await flush();
+        }
+      }
+    } catch {
+      // no kv table — nothing to migrate.
+    }
+  }
 }
 
 export function getDB() {
@@ -103,7 +167,7 @@ function pruneSessions() {
   }
 }
 
-// Debounced write. Coalesces bursts of account changes into one persist.
+// Debounced write — coalesces bursts of account changes into one persist.
 export function saveStore() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -112,23 +176,63 @@ export function saveStore() {
 }
 
 async function flush() {
-  if (backend === "pg") {
-    await pgInit();
-    await pool.query(
-      "INSERT INTO kv (key, val, updated_at) VALUES ($1, $2::jsonb, now()) " +
-        "ON CONFLICT (key) DO UPDATE SET val = EXCLUDED.val, updated_at = now()",
-      [PG_KEY, JSON.stringify(db)]
-    );
-    return;
-  }
+  if (backend === "pg") return flushPg();
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = DB_FILE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(db));
   fs.renameSync(tmp, DB_FILE);
 }
 
-// Flush any pending write immediately (called on graceful shutdown so the last
-// change before a deploy isn't lost to the debounce window).
+// Mirror the whole in-memory state into the tables in one transaction: upsert
+// every user, and replace the session set (sessions come and go on login/logout).
+async function flushPg() {
+  await pgInit();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const u of Object.values(db.users)) {
+      await client.query(
+        `INSERT INTO kyuubi_users
+           (id, username, color, xp, coins, level, games_played, wins, achievements, profile, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb, to_timestamp($11/1000.0), now())
+         ON CONFLICT (id) DO UPDATE SET
+           username=EXCLUDED.username, color=EXCLUDED.color, xp=EXCLUDED.xp, coins=EXCLUDED.coins,
+           level=EXCLUDED.level, games_played=EXCLUDED.games_played, wins=EXCLUDED.wins,
+           achievements=EXCLUDED.achievements, profile=EXCLUDED.profile, updated_at=now()`,
+        [
+          u.id,
+          u.name || "",
+          u.color || null,
+          u.xp || 0,
+          u.coins || 0,
+          levelOf(u.xp),
+          (u.stats && u.stats.gamesPlayed) || 0,
+          (u.stats && u.stats.wins) || 0,
+          JSON.stringify(u.achievements || []),
+          JSON.stringify(u),
+          u.createdAt || Date.now(),
+        ]
+      );
+    }
+    // Replace sessions (small set; simplest correct way to reflect logouts/prune).
+    await client.query("DELETE FROM kyuubi_sessions");
+    for (const [token, s] of Object.entries(db.sessions)) {
+      if (!s) continue;
+      await client.query(
+        "INSERT INTO kyuubi_sessions (token, user_id, exp) VALUES ($1,$2,$3)",
+        [token, s.userId, s.exp]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch {}
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// Flush any pending write immediately (graceful shutdown before a deploy).
 export async function flushNow() {
   clearTimeout(saveTimer);
   try {
