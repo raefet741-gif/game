@@ -16,7 +16,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch } from "./accounts.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUZZLE_DIR = path.join(__dirname, "..", "public", "puzzle");
@@ -358,6 +358,13 @@ class PuzzleRoom {
         });
       }
     }
+    // The puzzle race is free-for-all — each player is their own side.
+    recordMatch("puzzle", this.players.map((p) => ({
+      userId: p.userId,
+      name: p.name,
+      team: null,
+      won: p.id === this.winnerId,
+    })));
     this.emitRoom("pz_gameover", { winnerId: this.winnerId });
     this.broadcast(); // push the "finished" state (the swap path returns early)
   }
@@ -455,7 +462,12 @@ export function attachPuzzleIO(io, serverUrl) {
     player.socketId = socket.id;
     player.connected = true;
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
   }
   function handle(socket, fn) {
     try {
@@ -491,6 +503,7 @@ export function attachPuzzleIO(io, serverUrl) {
 
     socket.on("pz_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "pz_err_login" });
         const room = getPuzzleRoom(payload.code);
         if (!room) return ack(cb, { error: "pz_err_no_code" });
         if (payload.playerId) {

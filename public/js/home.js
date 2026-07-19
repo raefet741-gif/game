@@ -12,6 +12,19 @@ const LANGS = [
   { code: "fr", dir: "ltr" },
   { code: "ar", dir: "rtl" },
 ];
+// Each language's own name (autonym) + a small inline-SVG flag. Inline SVGs are
+// used instead of emoji flags because desktop Windows/Chrome renders regional
+// flag emoji as plain letter codes ("TN", "FR"), which would look broken.
+//   • en → England (St George's cross)   • fr → France   • ar → Tunisia
+const LANG_NAME = { en: "English", fr: "Français", ar: "العربية" };
+function flagSVG(code) {
+  if (code === "fr")
+    return `<svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#fff"/><rect width="1" height="2" fill="#0055A4"/><rect x="2" width="1" height="2" fill="#EF4135"/></svg>`;
+  if (code === "en")
+    return `<svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><rect x="12" width="6" height="20" fill="#CE1124"/><rect y="7" width="30" height="6" fill="#CE1124"/></svg>`;
+  // ar → Tunisia: red field, white disc, red crescent + red five-point star.
+  return `<svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#E70013"/><circle cx="15" cy="10" r="6" fill="#fff"/><circle cx="15" cy="10" r="4.6" fill="#E70013"/><circle cx="16.6" cy="10" r="3.7" fill="#fff"/><polygon points="17.6,7.6 18.14,9.26 19.88,9.26 18.47,10.28 19.01,11.94 17.6,10.92 16.19,11.94 16.73,10.28 15.32,9.26 17.06,9.26" fill="#E70013"/></svg>`;
+}
 let lang = detectLang();
 function detectLang() {
   const s = localStorage.getItem("spill.lang");
@@ -22,6 +35,7 @@ function detectLang() {
 function setLang(code) {
   if (!LANGS.some((l) => l.code === code)) return;
   lang = code;
+  langMenuOpen = false; // picking a language closes the dropdown
   localStorage.setItem("spill.lang", code);
   document.documentElement.lang = code;
   document.documentElement.dir = LANGS.find((l) => l.code === code).dir;
@@ -48,7 +62,7 @@ const T = {
     draw_tag: "Sketch the word and let the AI or the room judge it — or pass drawings around the circle and guess your way to points.",
     zip_name: "ZIP RACE",
     zip_tag: "Draw one line that hits every number in order and fills the whole grid. Solo, 1v1 or team vs team — first to finish wins.",
-    queens_name: "KYUUBI QUEENS",
+    queens_name: "QUEENS",
     queens_tag: "One crown per row, column & color patch — and none may touch. Solo, 1v1 or team vs team, racing best-of-N by fastest time.",
     headsup_name: "HEADS UP",
     headsup_tag: "Guess what's on your card while the room gives you clues. Your own photo packs, coming next.",
@@ -103,7 +117,7 @@ const T = {
     draw_tag: "Dessine le mot et laisse l'IA ou la salle juger — ou fais tourner les dessins dans le cercle et devine pour marquer des points.",
     zip_name: "ZIP RACE",
     zip_tag: "Trace une seule ligne qui passe chaque numéro dans l'ordre et remplit toute la grille. Solo, 1c1 ou équipe contre équipe — le premier à finir gagne.",
-    queens_name: "KYUUBI QUEENS",
+    queens_name: "QUEENS",
     queens_tag: "Une couronne par ligne, colonne et patch de couleur — sans jamais se toucher. Solo, 1c1 ou équipe contre équipe, au meilleur de N au temps le plus rapide.",
     headsup_name: "DEVINE",
     headsup_tag: "Devine ce que tu as pendant que la salle te donne des indices. Tes propres packs photos, bientôt.",
@@ -127,6 +141,11 @@ const T = {
     lb_pts: "pts",
     lb_wins: "victoires",
     lb_solved: "résolus",
+    history: "Historique des matchs",
+    hist_empty: "Aucun match — lance une partie versus !",
+    hist_vs: "contre",
+    won: "Gagné",
+    lost: "Perdu",
     close: "Fermer",
     err_fill: "Entre un nom et un mot de passe.",
     err_name_taken: "Ce nom est déjà pris.",
@@ -152,7 +171,7 @@ const T = {
     draw_tag: "ارسم الكلمة ودع الذكاء الاصطناعي أو الغرفة يحكم — أو مرّر الرسوم في الحلقة وخمّن لتجمع النقاط.",
     zip_name: "سباق زيب",
     zip_tag: "ارسم خطًا واحدًا يمرّ بكل رقم بالترتيب ويملأ الشبكة كاملة. فردي أو 1ضد1 أو فريق ضد فريق — أول من ينهي يفوز.",
-    queens_name: "ملكات كيوبي",
+    queens_name: "ملكات",
     queens_tag: "تاج واحد لكل صف وعمود ورقعة لون — دون أن يتلامسا. فردي أو 1ضد1 أو فريق ضد فريق، الأفضل من N بأسرع وقت.",
     headsup_name: "خمّن",
     headsup_tag: "خمّن ما على بطاقتك بينما تعطيك الغرفة تلميحات. حزم صورك الخاصة قريبًا.",
@@ -176,6 +195,11 @@ const T = {
     lb_pts: "نقطة",
     lb_wins: "انتصارات",
     lb_solved: "مكتملة",
+    history: "سجل المباريات",
+    hist_empty: "لا مباريات بعد — العب مباراة تنافسية!",
+    hist_vs: "ضد",
+    won: "فوز",
+    lost: "خسارة",
     close: "إغلاق",
     err_fill: "أدخل اسم المستخدم وكلمة المرور.",
     err_name_taken: "اسم المستخدم مأخوذ.",
@@ -329,13 +353,15 @@ function initial(name) {
 
 /* ---------------- account state + API ---------------- */
 let account = null;
-let modalKind = null; // 'auth' | 'profile' | 'leaderboard' | null
+let modalKind = null; // 'auth' | 'profile' | 'leaderboard' | 'history' | null
 let lbData = null;
 let lbGame = "spill"; // which game's own leaderboard is showing
+let histData = null;  // the logged-in player's match history
 let authTab = "login";
 let authBusy = false;
 let authError = "";
 let authDraft = { user: "", pass: "" };
+let langMenuOpen = false; // the flag language dropdown (games screen)
 
 function getToken() { return localStorage.getItem("kyuubi.token"); }
 function saveToken(tok) { localStorage.setItem("kyuubi.token", tok); }
@@ -362,10 +388,19 @@ async function apiMe(token) {
 }
 
 /* ---------------- UI pieces ---------------- */
+// A flag dropdown: a button showing the current language's flag, which opens a
+// list of all languages (flag + name) to pick from.
 function langBar() {
-  return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
-  ).join("")}</div>`;
+  return `<div class="langpick ${langMenuOpen ? "open" : ""}">
+    <button class="langpick-cur" type="button" data-act="toggle-lang" aria-haspopup="true" aria-expanded="${langMenuOpen}">
+      ${flagSVG(lang)}<span class="langpick-code">${lang === "ar" ? "ع" : lang.toUpperCase()}</span><i class="langpick-caret" aria-hidden="true">▾</i>
+    </button>
+    <div class="langpick-menu" role="menu">
+      ${LANGS.map(
+        (l) => `<button class="langpick-item ${lang === l.code ? "on" : ""}" type="button" data-lang="${l.code}" role="menuitemradio" aria-checked="${lang === l.code}">${flagSVG(l.code)}<span>${LANG_NAME[l.code]}</span></button>`
+      ).join("")}
+    </div>
+  </div>`;
 }
 function accountChip() {
   if (account) {
@@ -426,6 +461,47 @@ function leaderboardModal() {
   return modal(tabs + list, title);
 }
 
+async function fetchHistory() {
+  const token = getToken();
+  if (!token) { histData = []; if (modalKind === "history") render(); return; }
+  try {
+    const r = await fetch("/api/history", { headers: { Authorization: "Bearer " + token } });
+    histData = (await r.json()).history || [];
+  } catch {
+    histData = [];
+  }
+  if (modalKind === "history") render();
+}
+function historyModal() {
+  let list;
+  if (!histData) list = `<p class="muted" style="text-align:center;padding:16px">…</p>`;
+  else if (!histData.length) list = `<div class="empty-note">${t("hist_empty")}</div>`;
+  else
+    list = `<div class="hist-list">${histData
+      .map((h) => {
+        const g = GAMES.find((x) => x.id === h.game);
+        const emoji = g ? g.emoji : "🎮";
+        const gname = g ? g.name() : h.game;
+        const opp = (h.opponents || []).map(esc).join(", ") || "—";
+        let when = "";
+        try { when = new Date(h.at).toLocaleString(lang, { dateStyle: "short", timeStyle: "short" }); }
+        catch { when = new Date(h.at).toLocaleString(); }
+        return `<div class="hist-row ${h.won ? "win" : "loss"}">
+          <span class="hist-emoji">${emoji}</span>
+          <div class="hist-main">
+            <div class="hist-top">
+              <span class="hist-game">${esc(gname)}</span>
+              <span class="hist-res ${h.won ? "w" : "l"}">${h.won ? "🏆 " + t("won") : t("lost")}</span>
+            </div>
+            <div class="hist-vs">${t("hist_vs")} ${opp}</div>
+          </div>
+          <span class="hist-time">${esc(when)}</span>
+        </div>`;
+      })
+      .join("")}</div>`;
+  return modal(list, "📜 " + t("history"));
+}
+
 const GAMES = [
   { id: "spill", href: "/spill", emoji: "🍸", accent: "var(--pink)", name: () => "SPILL", tag: () => t("spill_tag"), pill: { en: "Truth or Dare", fr: "Action/Vérité", ar: "صراحة/تحدٍّ" }, ready: true },
   { id: "memory", href: "/memory", emoji: "🎴", accent: "var(--cyan)", name: () => t("memory_name"), tag: () => t("memory_tag"), pill: { en: "Team memory", fr: "Mémoire en équipe", ar: "ذاكرة جماعية" }, ready: true },
@@ -445,7 +521,6 @@ const KANJI = "和 · 平和 · 力 · 栄誉";
 // screen 1 — the hero: raefet.png behind, a call to "Enter the village"
 function accueilView() {
   return `
-  <div class="kz-corner-lang">${langBar()}</div>
   <section class="kz-accueil">
     <div class="kz-hero-bg"></div>
     <div class="kz-hero-veil"></div>
@@ -531,7 +606,7 @@ function gamesView() {
   <div class="kz-games">
     <div class="kz-games-top"></div>
     <header class="kz-header">
-      <div class="kz-logo sm">🦊 Kyuubi<span>Z</span></div>
+      <div class="kz-logo sm"><img class="kz-logo-chip" src="/media/logo-192.png" alt="KyuubiZ" width="192" height="192" /></div>
       <div class="kz-nav">${langBar()}${lbButton()}${accountChip()}</div>
     </header>
     <main class="kz-main">
@@ -612,7 +687,8 @@ function profileModal() {
     </div>
     <div class="games-title" style="font-size:16px;margin:16px 4px 8px">${t("achievements")} · ${(a.achievements || []).length}/${ACH.length}</div>
     <div class="ach-grid">${achs}</div>
-    <button class="btn btn-ghost block" style="margin-top:14px" data-act="logout">${t("logout")}</button>`,
+    <button class="btn btn-ghost block" style="margin-top:14px" data-act="open-history">📜 ${t("history")}</button>
+    <button class="btn btn-ghost block" style="margin-top:8px" data-act="logout">${t("logout")}</button>`,
     t("profile")
   );
 }
@@ -631,6 +707,8 @@ function overlayHTML() {
     ? profileModal()
     : modalKind === "leaderboard"
     ? leaderboardModal()
+    : modalKind === "history"
+    ? historyModal()
     : "";
 }
 
@@ -640,6 +718,12 @@ $home.addEventListener("click", async (e) => {
   const langBtn = e.target.closest("[data-lang]");
   if (langBtn) { setLang(langBtn.dataset.lang); return; }
   const el = e.target.closest("[data-act]");
+  // Close the language dropdown when clicking anywhere outside of it.
+  if (langMenuOpen && !e.target.closest(".langpick")) {
+    langMenuOpen = false;
+    if (!el) { render(); return; }
+    // else fall through — onAct will re-render.
+  }
   if (!el) return;
   try { await onAct(el.dataset.act, el); } catch (err) { console.error(err); }
 });
@@ -657,6 +741,7 @@ $home.addEventListener("keydown", (e) => {
 async function onAct(act, el) {
   switch (act) {
     case "noop": break;
+    case "toggle-lang": langMenuOpen = !langMenuOpen; render(); break;
     case "enter-village":
       // From the hero: members go straight to the games menu, guests to sign-in.
       if (account) { view = "games"; render(); window.scrollTo(0, 0); }
@@ -675,6 +760,7 @@ async function onAct(act, el) {
       if (g && g !== lbGame) { lbGame = g; lbData = null; render(); fetchLeaderboard(); }
       break;
     }
+    case "open-history": modalKind = "history"; histData = null; render(); fetchHistory(); break;
     case "close-modal": modalKind = null; authError = ""; render(); break;
     case "auth-tab": authTab = el.dataset.tab; authError = ""; render(); focusUser(); break;
     case "do-login": await doAuth("login"); break;

@@ -12,7 +12,7 @@
 // copy answers. Runs on its own Socket.IO namespace ("/sudoku").
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch, spendCoins } from "./accounts.js";
 
 const rooms = new Map(); // code -> SudokuRoom
 let ioNsp = null;
@@ -54,6 +54,11 @@ export const DIFFICULTIES = {
 // Reward economy (per game).
 const REWARD_WIN = { coins: 50, xp: 25 };
 const REWARD_PLAYED = { coins: 10, xp: 5 };
+
+// Solo "use a hint" — reveals one correct cell. It's a paid power-up: it costs
+// coins and can only be bought ONCE per game (per player). Solo only, so it never
+// hands anyone an advantage in a live race.
+export const HINT = { cost: 50 };
 
 function randId() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
@@ -264,6 +269,7 @@ class SudokuRoom {
       socketId: null,
       userId: null,
       joinedAt: Date.now(),
+      hintUsed: false, // solo hint power-up — one purchase per game
     };
     this.players.push(player);
     return player;
@@ -365,6 +371,7 @@ class SudokuRoom {
     this.teamGrids = {};
     this.teamFinish = {};
     for (const t of this.filledTeams()) this.teamGrids[t] = puzzle.slice();
+    for (const p of this.players) p.hintUsed = false; // fresh hint each game
     this.startMs = Date.now();
     this.winnerTeam = null;
     this.result = null;
@@ -399,25 +406,44 @@ class SudokuRoom {
   }
 
   // Reveal one correct empty cell (locked as a clue). Solo only — it would be
-  // unfair in a race — and mirrors the LinkedIn "use a hint" affordance.
+  // unfair in a race — and mirrors the LinkedIn "use a hint" affordance. It's a
+  // paid power-up: HINT.cost coins, and only ONE purchase per player per game.
+  // Charges only after confirming there's a cell to reveal AND the player can
+  // afford it, so we never take coins for a no-op. Returns a result for the ack.
   hint(playerId) {
-    if (this.status !== "playing" || !this.solo) return;
+    if (this.status !== "playing" || !this.solo) return { error: "sdk_err_solo_only" };
     const p = this.getPlayer(playerId);
-    if (!p || !this.solution) return;
+    if (!p || !p.connected || !this.solution) return { error: "sdk_err_glitch" };
+    if (!p.userId) return { error: "sdk_err_login" };
+    if (p.hintUsed) return { error: "sdk_err_hint_used" };
     const grid = this.teamGrids[p.team];
-    if (!grid) return;
+    if (!grid) return { error: "sdk_err_glitch" };
     const empties = [];
     for (let i = 0; i < this.dims.cells; i++)
       if (!this.given[i] && !grid[i]) empties.push(i);
-    if (!empties.length) return;
+    if (!empties.length) return { error: "sdk_err_nothing" };
+
+    const spend = spendCoins(p.userId, HINT.cost);
+    if (spend.error) return { error: "sdk_err_coins" };
+    p.hintUsed = true;
+
     const idx = empties[Math.floor(Math.random() * empties.length)];
     grid[idx] = this.solution[idx];
     this.given[idx] = true; // lock the revealed cell
     this.emitTeamGrid(p.team, { hint: idx });
-    if (isSolved(grid, this.dims)) {
+    const done = isSolved(grid, this.dims);
+    if (done) {
       this.teamFinish[p.team] = Date.now() - this.startMs;
       this.finishGame(p.team);
     }
+    return {
+      status: "ok",
+      cost: HINT.cost,
+      coins: spend.coins,
+      profile: spend.profile,
+      idx,
+      finished: done,
+    };
   }
 
   finishGame(winnerTeam) {
@@ -493,6 +519,14 @@ class SudokuRoom {
         });
       }
     }
+    if (!this.solo) {
+      recordMatch("sudoku", this.players.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        team: p.team,
+        won: p.team === this.winnerTeam,
+      })));
+    }
   }
 
   playAgain(playerId) {
@@ -528,6 +562,7 @@ class SudokuRoom {
       team: p.team,
       connected: p.connected,
       isHost: p.id === this.hostId,
+      hintUsed: !!p.hintUsed,
     };
   }
 
@@ -567,6 +602,7 @@ class SudokuRoom {
       cellsTotal: this.status === "lobby" ? dimsFor(this.settings.size).cells : this.dims.cells,
       winnerTeam: this.winnerTeam,
       result: this.result,
+      hintCost: HINT.cost,
     };
   }
 
@@ -624,7 +660,13 @@ export function attachSudokuIO(io, serverUrl) {
   // only accounts earn coins + XP).
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   function handle(socket, fn) {
@@ -648,6 +690,7 @@ export function attachSudokuIO(io, serverUrl) {
 
     socket.on("sdk_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "sdk_err_login" });
         const { room, player } = createSudokuRoom(payload.name, payload.color);
         bind(socket, room, player);
         linkAccount(player, payload.token);
@@ -661,6 +704,7 @@ export function attachSudokuIO(io, serverUrl) {
 
     socket.on("sdk_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "sdk_err_login" });
         const room = getSudokuRoom(payload.code);
         if (!room) return ack(cb, { error: "sdk_err_no_code" });
 
@@ -708,9 +752,12 @@ export function attachSudokuIO(io, serverUrl) {
       const { room, player } = ctx(socket);
       if (room && player) room.setCell(player.id, idx, val);
     });
-    socket.on("sdk_hint", () => {
+    // Buying a hint resolves via ack (so the client learns its new coin balance
+    // and any error) plus the room's own targeted grid emit for the reveal.
+    socket.on("sdk_hint", (payload, cb) => {
       const { room, player } = ctx(socket);
-      if (room && player) room.hint(player.id);
+      if (!room || !player) return ack(cb, { error: "sdk_err_no_room" });
+      ack(cb, room.hint(player.id));
     });
     socket.on("sdk_end", () =>
       handle(socket, (room, player) => room.endByHost(player.id))

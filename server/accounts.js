@@ -161,6 +161,52 @@ function applyRanked(user, game, won) {
   }
 }
 
+// ---- Match history ---------------------------------------------------------
+// Each finished head-to-head game appends one entry to every logged-in player's
+// history: did they win, who they were up against, and when. Solo play isn't
+// recorded (there's no opponent). We keep the most recent HISTORY_CAP matches.
+const HISTORY_CAP = 60;
+
+// roster: [{ userId, name, team, won }]. `team` is a number for team games or
+// null for free-for-all (each player is their own side). Opponents are everyone
+// not on your side; teammates are the rest of your side. Entries with no
+// opponent (e.g. a lone player) are skipped — there's nothing to record.
+export function recordMatch(game, roster = []) {
+  if (!RANKED_SET.has(game)) return;
+  const db = getDB();
+  const at = Date.now();
+  const clean = roster.map((r) => ({
+    userId: r.userId || null,
+    name: (r.name || "?").toString().slice(0, 20),
+    team: r.team == null ? null : r.team,
+    won: !!r.won,
+  }));
+  const sameSide = (a, b) => a.team != null && b.team != null && a.team === b.team;
+
+  for (const me of clean) {
+    if (!me.userId) continue;
+    const user = db.users[me.userId];
+    if (!user) continue;
+    const opponents = clean.filter((o) => o !== me && !sameSide(o, me)).map((o) => o.name);
+    if (!opponents.length) continue; // no real opponent → nothing to log
+    const teammates = clean.filter((o) => o !== me && sameSide(o, me)).map((o) => o.name);
+    if (!Array.isArray(user.history)) user.history = [];
+    user.history.push({ game, at, won: me.won, opponents, teammates });
+    if (user.history.length > HISTORY_CAP) {
+      user.history.splice(0, user.history.length - HISTORY_CAP);
+    }
+  }
+  saveStore();
+}
+
+// A player's match history, newest first.
+export function historyFor(userId, limit = HISTORY_CAP) {
+  const db = getDB();
+  const user = db.users[userId];
+  if (!user || !Array.isArray(user.history)) return [];
+  return user.history.slice().reverse().slice(0, limit);
+}
+
 function hashPassword(password, salt) {
   return crypto.scryptSync(String(password), salt, 64).toString("hex");
 }
@@ -441,6 +487,13 @@ export function awardGameResults(room) {
       profile: publicProfile(user),
     });
   }
+  // SPILL is free-for-all — everyone is on their own side (team: null).
+  recordMatch("spill", room.players.map((p) => ({
+    userId: p.userId,
+    name: p.name,
+    team: null,
+    won: p.id === room.winnerId,
+  })));
   saveStore();
   return results;
 }

@@ -16,7 +16,7 @@
 // layout (regions) is shared. Runs on its own Socket.IO namespace ("/queens").
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch } from "./accounts.js";
 
 const rooms = new Map(); // code -> QueensRoom
 let ioNsp = null;
@@ -553,6 +553,14 @@ class QueensRoom {
         });
       }
     }
+    if (!this.solo) {
+      recordMatch("queens", this.players.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        team: p.team,
+        won: winnerTeam != null && p.team === winnerTeam,
+      })));
+    }
   }
 
   playAgain(playerId) {
@@ -704,7 +712,13 @@ export function attachQueensIO(io, serverUrl) {
 
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   function handle(socket, fn) {
@@ -728,6 +742,7 @@ export function attachQueensIO(io, serverUrl) {
 
     socket.on("queens_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "q_err_login" });
         const { room, player } = createQueensRoom(payload.name, payload.color);
         bind(socket, room, player);
         linkAccount(player, payload.token);
@@ -741,6 +756,7 @@ export function attachQueensIO(io, serverUrl) {
 
     socket.on("queens_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "q_err_login" });
         const room = getQueensRoom(payload.code);
         if (!room) return ack(cb, { error: "q_err_no_code" });
 

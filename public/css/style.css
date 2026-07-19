@@ -1308,6 +1308,323 @@ button.bluff-opt:hover {
   color: #04211f;
   border-color: transparent;
 }
+/* Flag-only language pills (games show flags instead of EN/FR/ع text). */
+.langpill.flagpill {
+  min-width: 0;
+  padding: 5px 7px;
+  line-height: 0;
+}
+.flag {
+  width: 26px;
+  height: 17px;
+  display: block;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.langpill.on .flag { box-shadow: 0 0 0 2px #04211f; }
+
+/* ---------- SPILL landing: SPILL.png filling the whole screen (cover), with
+   transparent clickable hit-areas laid over the painted buttons + flags ---------- */
+.spill-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da; /* paper fallback behind any uncovered edge */
+  z-index: 1;
+}
+/* Smallest box with the image's aspect ratio that still covers the viewport,
+   centered. Overflow on .spill-fs crops the excess — like background-size:cover,
+   but as a real element so the % hit-areas track the image. */
+.spill-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.93); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.79487));
+  aspect-ratio: 1400 / 780;
+}
+.spill-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* invisible, percentage-positioned tap targets over the painted UI */
+.hit {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 12px;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+}
+.hit:hover { background: rgba(255, 255, 255, 0.14); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
+.hit:active { transform: translateY(1px) scale(0.99); }
+.hit-create { left: 35.5%; top: 71.0%; width: 34.0%; height: 9.6%; }
+.hit-join   { left: 35.5%; top: 83.6%; width: 31.8%; height: 8.6%; }
+.hit-flag { top: 4.8%; height: 8.2%; border-radius: 50%; }
+.hit-flag:hover { background: rgba(255, 255, 255, 0.18); }
+.hit-flag.on { box-shadow: 0 0 0 2px var(--red); }
+.hit-en { left: 43.5%; width: 4.6%; }
+.hit-fr { left: 47.8%; width: 4.6%; }
+.hit-ar { left: 52.1%; width: 4.6%; }
+
+/* ---------- ZIP landing: ZIP.png full-screen wallpaper (same technique as SPILL,
+   reusing the shared .hit hit-areas). Solo gets a small corner pill. ---------- */
+.zip-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.zip-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.79949));
+  aspect-ratio: 1400 / 778;
+}
+.zip-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.zip-solo-pill {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(26, 21, 18, 0.25);
+  background: rgba(250, 246, 238, 0.85);
+  backdrop-filter: blur(4px);
+  color: #1a1512;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -8px rgba(26, 21, 18, 0.6);
+  transition: background 0.15s ease, transform 0.08s ease;
+}
+.zip-solo-pill:hover { background: #faf6ee; }
+.zip-solo-pill:active { transform: translateY(1px); }
+
+/* ---------- MEMORY MATCH landing: memory-match.png full-screen wallpaper
+   (same technique as SPILL; flags nudged to match this image). ---------- */
+.mem-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.mem-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.80412));
+  aspect-ratio: 1400 / 776;
+}
+.mem-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* this mockup's flags sit higher & tighter than the shared defaults */
+.mem-fs .hit-flag { top: 2.2%; height: 7.6%; }
+.mem-fs .hit-en { left: 42.8%; width: 4.4%; }
+.mem-fs .hit-fr { left: 47.8%; width: 4.4%; }
+.mem-fs .hit-ar { left: 52.8%; width: 4.4%; }
+
+/* ---------- SUDOKU RACE landing: sudoku.png full-screen wallpaper. This mockup
+   bakes in three buttons (Create / Join / Play solo) + flags. ---------- */
+.sdk-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.sdk-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.80412));
+  aspect-ratio: 1400 / 776;
+}
+.sdk-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* sudoku-specific hit positions (three buttons, lower layout) */
+.sdk-fs .hit-create { left: 35.5%; top: 70.3%; width: 33.6%; height: 7.8%; }
+.sdk-fs .hit-join   { left: 35.5%; top: 78.8%; width: 32.4%; height: 7.2%; }
+.sdk-fs .hit-solo   { left: 36.0%; top: 87.0%; width: 30.0%; height: 7.0%; }
+.sdk-fs .hit-flag { top: 1.8%; height: 7.6%; }
+.sdk-fs .hit-en { left: 42.8%; width: 4.4%; }
+.sdk-fs .hit-fr { left: 47.3%; width: 4.4%; }
+.sdk-fs .hit-ar { left: 51.8%; width: 4.4%; }
+
+/* ---------- PICTURE PUZZLE landing: puzzle.png full-screen wallpaper. Two
+   side-by-side buttons (Solo / Multiplayer) + flags. ---------- */
+.pz-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.pz-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.79949));
+  aspect-ratio: 1400 / 778;
+}
+.pz-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* puzzle-specific hit positions (two side-by-side buttons) */
+.pz-fs .hit-solo  { left: 34.3%; top: 75.8%; width: 15.8%; height: 8.4%; }
+.pz-fs .hit-multi { left: 50.3%; top: 75.8%; width: 17.4%; height: 8.4%; }
+.pz-fs .hit-flag { top: 1.5%; height: 7.4%; }
+.pz-fs .hit-en { left: 42.9%; width: 4.2%; }
+.pz-fs .hit-fr { left: 47.4%; width: 4.2%; }
+.pz-fs .hit-ar { left: 51.9%; width: 4.2%; }
+
+/* ---------- WORD WONDERS landing: word.png full-screen wallpaper.
+   Two stacked buttons (Create / Join) + flags. ---------- */
+.ww-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.ww-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.79949));
+  aspect-ratio: 1400 / 778;
+}
+.ww-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* word-wonders-specific hit positions */
+.ww-fs .hit-create { left: 35.5%; top: 73.5%; width: 31.5%; height: 8.0%; }
+.ww-fs .hit-join   { left: 35.5%; top: 82.2%; width: 29.0%; height: 7.6%; }
+.ww-fs .hit-flag { top: 1.4%; height: 7.4%; }
+.ww-fs .hit-en { left: 43.9%; width: 4.2%; }
+.ww-fs .hit-fr { left: 48.2%; width: 4.2%; }
+.ww-fs .hit-ar { left: 52.5%; width: 4.2%; }
+
+/* ---------- DOODLE DUEL landing: doodle.png full-screen wallpaper.
+   Two stacked buttons (Create / Join) + flags. ---------- */
+.dd-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.dd-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.77665));
+  aspect-ratio: 1400 / 788;
+}
+.dd-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* doodle-specific hit positions */
+.dd-fs .hit-create { left: 35.5%; top: 73.5%; width: 31.5%; height: 7.9%; }
+.dd-fs .hit-join   { left: 35.5%; top: 82.2%; width: 30.0%; height: 7.6%; }
+.dd-fs .hit-flag { top: 1.4%; height: 7.2%; }
+.dd-fs .hit-en { left: 43.5%; width: 4.2%; }
+.dd-fs .hit-fr { left: 47.8%; width: 4.2%; }
+.dd-fs .hit-ar { left: 52.1%; width: 4.2%; }
+
+/* ---------- QUEENS landing: queens.png full-screen wallpaper.
+   Three stacked buttons (Create / Join / Play solo) + flags. ---------- */
+.qn-fs {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #efe8da;
+  z-index: 1;
+}
+.qn-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.97); /* wallpaper ~3% smaller */
+  width: max(100vw, calc(100dvh * 1.79257));
+  aspect-ratio: 1400 / 781;
+}
+.qn-photo-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* queens-specific hit positions (three stacked buttons) */
+.qn-fs .hit-create { left: 35.3%; top: 68.0%; width: 32.3%; height: 7.8%; }
+.qn-fs .hit-join   { left: 35.3%; top: 76.2%; width: 32.3%; height: 7.4%; }
+.qn-fs .hit-solo   { left: 35.3%; top: 84.5%; width: 32.3%; height: 7.4%; }
+.qn-fs .hit-flag { top: 1.5%; height: 7.0%; }
+.qn-fs .hit-en { left: 43.4%; width: 4.2%; }
+.qn-fs .hit-fr { left: 47.7%; width: 4.2%; }
+.qn-fs .hit-ar { left: 52.0%; width: 4.2%; }
 
 /* Arabic uses Cairo — Anton/Space Grotesk carry no Arabic glyphs. Brand stays Latin. */
 html[lang="ar"] body {

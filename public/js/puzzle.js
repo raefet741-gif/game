@@ -6,7 +6,7 @@
 //   • Custom image — upload a photo or take a selfie; the server runs it through
 //     the Gemini image model (falls back to the raw photo when no key).
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/puzzle", { reconnection: true });
 const $app = document.getElementById("app");
@@ -149,6 +149,27 @@ function loadSession() { try { return JSON.parse(localStorage.getItem("puzzle.se
 function saveSession(s) { session = s; localStorage.setItem("puzzle.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("puzzle.session"); }
 function accountToken() { return localStorage.getItem("kyuubi.token") || null; }
+
+// Logged-in profile ({name, color, ...}) or null. Login is required to play, so
+// this is populated on boot and guests are bounced to the home page.
+let account = null;
+function refreshAccount() {
+  const token = accountToken();
+  if (!token) { location.replace("/"); return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      // The name always comes from the signed-in profile — players never retype it.
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      bootRender();
+    })
+    .catch(() => {});
+}
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "", images: [] };
@@ -451,7 +472,7 @@ function startSolo() {
 /* ---------------- multiplayer actions ---------------- */
 function createRoom() {
   if (!accountToken()) return toast(t("err_login"), "error");
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("pz_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -461,7 +482,7 @@ function createRoom() {
   });
 }
 function joinRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   const code = (drafts.joinCode || "").trim().toUpperCase();
   if (!name) return toast(t("your_name"), "error");
   if (!code) return toast(t("room_code"), "error");
@@ -531,7 +552,7 @@ async function makePuzzleFromCustom() {
 
 /* ---------------- render ---------------- */
 function langBar() {
-  return `<div class="langbar">${LANGS.map((l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`).join("")}</div>`;
+  return `<div class="langbar">${LANGS.map((l) => `<button class="langpill flagpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`).join("")}</div>`;
 }
 function shell(inner) {
   return `<div class="pz-top"><span class="pz-logo">🧩 ${t("brand")}</span>${langBar()}</div><div class="pz-wrap">${inner}</div>${customUI?.open ? customModal() : ""}`;
@@ -565,16 +586,19 @@ function render() {
 }
 
 function renderLanding() {
-  $app.innerHTML = shell(`
-    <div class="pz-hero">
-      <div class="pz-emoji">🧩</div>
-      <h1 class="pz-brand">${t("brand")}</h1>
-      <p class="pz-tagline">${t("tagline")}</p>
-      <div class="pz-cta-row">
-        <button class="pz-btn primary" data-act="go-solo">🧍 ${t("solo")}</button>
-        <button class="pz-btn ghost" data-act="go-mp">👥 ${t("multiplayer")}</button>
-      </div>
-    </div>`);
+  // Full-screen puzzle.png wallpaper. The Solo / Multiplayer buttons and flags
+  // are painted into the image; transparent %-positioned hit-areas (shared .hit
+  // classes, puzzle positions under .pz-fs) sit over them.
+  $app.innerHTML = `<div class="pz-fs">
+    <div class="pz-stage">
+      <img class="pz-photo-img" src="/media/puzzle-full.png" alt="Picture Puzzle — jigsaw race" width="1400" height="778" />
+      <button class="hit hit-solo" data-act="go-solo" aria-label="${esc(t("solo"))}"></button>
+      <button class="hit hit-multi" data-act="go-mp" aria-label="${esc(t("multiplayer"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-lang="ar" aria-label="العربية"></button>
+    </div>
+  </div>`;
 }
 
 function renderSoloSetup() {
@@ -630,9 +654,8 @@ function renderMpForm() {
     <div class="pz-card pz-form">
       <button class="pz-link" data-act="go-mp">‹ ${t("back")}</button>
       <h2 class="pz-h2">${isCreate ? t("create") : t("join")}</h2>
-      ${isCreate && !accountToken() ? `<div class="pz-note">${t("login_to_play")}</div>` : ""}
       <label class="pz-label">${t("your_name")}</label>
-      <input class="pz-input" id="pz-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+      <div class="pz-input pz-name-chip">${esc(myName())}</div>
       ${isCreate ? "" : `<label class="pz-label">${t("room_code")}</label><input class="pz-input" id="pz-code" maxlength="12" value="${esc(drafts.joinCode)}" placeholder="PZL-ABCD" style="text-transform:uppercase" />`}
       <label class="pz-label">${t("pick_color")}</label>
       ${colorDots(drafts.color)}
@@ -823,4 +846,5 @@ function bootRender() {
   if (pre === "mp-menu") return renderMpMenu();
   render();
 }
+refreshAccount();
 bootRender();

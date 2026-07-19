@@ -4,7 +4,7 @@
 // teammates), and turns taps into sdk_set events. Opponent grids are never sent —
 // only their fill progress — so nobody can copy. Winning teams earn coins + XP.
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/sudoku", { reconnection: true });
 const $app = document.getElementById("app");
@@ -46,7 +46,7 @@ const T = {
     settings: "Settings", num_teams: "Number of teams", difficulty: "Difficulty",
     easy: "Easy", medium: "Medium", hard: "Hard",
     board_size: "Board", size_classic: "Classic 9×9", size_mini: "Mini 6×6",
-    stuck: "Stuck?", use_hint: "Use a hint",
+    stuck: "Stuck?", use_hint: "Use a hint", hint_used: "Hint used", hint_taken: "Revealed a cell",
     start_game: "Start game", need_players: "Need at least 2 players.",
     need_teams: "Fill at least 2 teams.", host_only: "Only the host can do that.",
     waiting_host: "Waiting for the host to start…", you: "you", host: "host",
@@ -62,6 +62,8 @@ const T = {
     err_locked: "Can't change that after the game starts.",
     err_started: "That game already started.", err_no_code: "No room with that code.",
     err_generic: "Something glitched — try again.",
+    err_login: "Log in to buy a hint.", err_hint_used: "You've already used your hint this game.",
+    err_coins: "Not enough coins for a hint.", err_nothing: "Nothing left to reveal.",
   },
   fr: {
     brand: "SUDOKU RACE",
@@ -76,7 +78,7 @@ const T = {
     settings: "Réglages", num_teams: "Nombre d'équipes", difficulty: "Difficulté",
     easy: "Facile", medium: "Moyen", hard: "Difficile",
     board_size: "Grille", size_classic: "Classique 9×9", size_mini: "Mini 6×6",
-    stuck: "En panne d'inspiration ?", use_hint: "Utiliser un indice",
+    stuck: "En panne d'inspiration ?", use_hint: "Utiliser un indice", hint_used: "Indice utilisé", hint_taken: "Une case révélée",
     start_game: "Démarrer", need_players: "Il faut au moins 2 joueurs.",
     need_teams: "Remplis au moins 2 équipes.", host_only: "Seul l'hôte peut faire ça.",
     waiting_host: "En attente du lancement par l'hôte…", you: "toi", host: "hôte",
@@ -92,6 +94,8 @@ const T = {
     err_locked: "Impossible de changer ça une fois lancé.",
     err_started: "La partie a déjà commencé.", err_no_code: "Aucun salon avec ce code.",
     err_generic: "Un bug — réessaie.",
+    err_login: "Connecte-toi pour acheter un indice.", err_hint_used: "Tu as déjà utilisé ton indice cette partie.",
+    err_coins: "Pas assez de pièces pour un indice.", err_nothing: "Plus rien à révéler.",
   },
   ar: {
     brand: "سباق سودوكو",
@@ -106,7 +110,7 @@ const T = {
     settings: "الإعدادات", num_teams: "عدد الفرق", difficulty: "الصعوبة",
     easy: "سهل", medium: "متوسط", hard: "صعب",
     board_size: "الشبكة", size_classic: "كلاسيكي ٩×٩", size_mini: "ميني ٦×٦",
-    stuck: "عالق؟", use_hint: "استخدم تلميحًا",
+    stuck: "عالق؟", use_hint: "استخدم تلميحًا", hint_used: "تم استخدام التلميح", hint_taken: "تم كشف خلية",
     start_game: "ابدأ اللعبة", need_players: "تحتاج لاعبَين على الأقل.",
     need_teams: "املأ فريقين على الأقل.", host_only: "المضيف فقط يمكنه ذلك.",
     waiting_host: "بانتظار أن يبدأ المضيف…", you: "أنت", host: "المضيف",
@@ -122,6 +126,8 @@ const T = {
     err_locked: "لا يمكن تغيير ذلك بعد بدء اللعبة.",
     err_started: "بدأت اللعبة بالفعل.", err_no_code: "لا توجد غرفة بهذا الرمز.",
     err_generic: "حدث خلل — حاول مجددًا.",
+    err_login: "سجّل الدخول لشراء تلميح.", err_hint_used: "لقد استخدمت تلميحك في هذه الجولة.",
+    err_coins: "لا تملك عملات كافية للتلميح.", err_nothing: "لا يوجد المزيد للكشف.",
   },
 };
 const t = (k) => (T[lang] || T.en)[k] || T.en[k] || k;
@@ -133,6 +139,10 @@ const ERR_MAP = {
   sdk_err_need_teams: "need_teams",
   sdk_err_started: "err_started",
   sdk_err_no_code: "err_no_code",
+  sdk_err_login: "err_login",
+  sdk_err_hint_used: "err_hint_used",
+  sdk_err_coins: "err_coins",
+  sdk_err_nothing: "err_nothing",
 };
 function tErr(key) {
   return t(ERR_MAP[key] || "err_generic");
@@ -146,6 +156,31 @@ function loadSession() {
 function saveSession(s) { session = s; localStorage.setItem("sudoku.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("sudoku.session"); }
 function accountToken() { return localStorage.getItem("kyuubi.token") || null; }
+
+// Pull the logged-in profile so we can show the live coin balance on the hint
+// power-up. Guests (no token) stay null and just get a "log in" prompt.
+let account = null; // logged-in profile ({coins,...}) or null for guests
+let buyingHint = false; // guards against double-buying the hint mid-flight
+function refreshAccount() {
+  const token = accountToken();
+  // Login is required to play — bounce guests back to the home page where the
+  // sign-in / sign-up lives.
+  if (!token) { location.replace("/"); return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      // The name always comes from the signed-in profile — players never retype it.
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      render();
+    })
+    .catch(() => {});
+}
+function myCoins() { return account ? account.coins || 0 : 0; }
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -270,7 +305,10 @@ socket.on("sdk_gameover", ({ winnerTeam }) => {
   if (winnerTeam != null && myTeam() === winnerTeam) confettiBurst();
 });
 socket.on("sdk_reward", ({ coins, xp, won, profile }) => {
-  if (profile) toast(`${won ? "🏆 " : ""}${t("your_reward")} +${coins} 🪙 · +${xp} ${t("xp")}`, "ok");
+  if (profile) {
+    account = profile; // keep the local coin balance in sync
+    toast(`${won ? "🏆 " : ""}${t("your_reward")} +${coins} 🪙 · +${xp} ${t("xp")}`, "ok");
+  }
 });
 socket.on("sdk_notice", ({ type, message }) =>
   toast(tErr(message), type === "error" ? "error" : "ok")
@@ -303,7 +341,7 @@ function stopTick() {
 
 /* ---------------- actions ---------------- */
 function createRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("sdk_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -324,7 +362,7 @@ function joinRoom() {
 }
 // Solo: create a private room, set difficulty, and start alone in one step.
 function startSolo() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   const diff = drafts.difficulty || "medium";
   const size = drafts.size || "classic";
@@ -334,6 +372,30 @@ function startSolo() {
     socket.emit("sdk_settings", { difficulty: diff, size });
     socket.emit("sdk_start", { solo: true });
     applyState(res.state);
+  });
+}
+// Buy the solo hint power-up: 50 coins, once per game. The server is the source
+// of truth (it charges the coins and enforces the once-per-game limit); the
+// client-side checks here just give instant feedback before the round-trip.
+function buyHint() {
+  if (buyingHint) return;
+  if (!accountToken()) return toast(tErr("sdk_err_login"), "error");
+  if (myPlayer()?.hintUsed) return toast(tErr("sdk_err_hint_used"), "error");
+  const cost = state?.hintCost || 50;
+  if (myCoins() < cost) return toast(tErr("sdk_err_coins"), "error");
+  buyingHint = true;
+  render(); // disable the button while the purchase is in flight
+  socket.emit("sdk_hint", {}, (res) => {
+    buyingHint = false;
+    if (!res || res.error) {
+      if (res && res.error) toast(tErr(res.error), "error");
+      return render();
+    }
+    if (res.profile) account = res.profile;
+    else if (res.coins != null && account) account.coins = res.coins;
+    sfx.point?.();
+    toast(`${t("hint_taken")} · -${res.cost} 🪙`, "ok");
+    render();
   });
 }
 function selectCell(i) {
@@ -355,7 +417,7 @@ function inputValue(val) {
 /* ---------------- render ---------------- */
 function langBar() {
   return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
+    (l) => `<button class="langpill flagpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`
   ).join("")}</div>`;
 }
 function colorDots(selectedColor) {
@@ -400,7 +462,7 @@ function renderPre() {
         <button class="sdk-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="sdk-h2">${t("solo_title")}</h2>
         <label class="sdk-label">${t("your_name")}</label>
-        <input class="sdk-input" id="sdk-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="sdk-input sdk-name-chip">${esc(myName())}</div>
         <label class="sdk-label">${t("board_size")}</label>
         ${sizeSelect()}
         <label class="sdk-label">${t("difficulty")}</label>
@@ -419,7 +481,7 @@ function renderPre() {
         <button class="sdk-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="sdk-h2">${isCreate ? t("create") : t("join")}</h2>
         <label class="sdk-label">${t("your_name")}</label>
-        <input class="sdk-input" id="sdk-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="sdk-input sdk-name-chip">${esc(myName())}</div>
         ${isCreate ? "" : `
           <label class="sdk-label">${t("room_code")}</label>
           <input class="sdk-input" id="sdk-code" maxlength="12" value="${esc(drafts.joinCode)}" placeholder="SDK-ABCD" style="text-transform:uppercase" />`}
@@ -430,20 +492,20 @@ function renderPre() {
     `);
     return;
   }
-  $app.innerHTML = shell(`
-    <div class="sdk-hero">
-      <div class="sdk-emoji">🔢</div>
-      <h1 class="sdk-brand">${t("brand")}</h1>
-      <p class="sdk-tagline">${t("tagline")}</p>
-      <div class="sdk-cta-row">
-        <button class="sdk-btn primary" data-act="go-create">${t("create")}</button>
-        <button class="sdk-btn ghost" data-act="go-join">${t("join")}</button>
-      </div>
-      <div class="sdk-cta-row">
-        <button class="sdk-btn ghost" data-act="go-solo">🧩 ${t("solo")}</button>
-      </div>
+  // Full-screen sudoku.png wallpaper. Create / Join / Play solo and the flags are
+  // painted into the image; transparent %-positioned hit-areas (shared .hit
+  // classes, sudoku-specific positions under .sdk-fs) sit over them.
+  $app.innerHTML = `<div class="sdk-fs">
+    <div class="sdk-stage">
+      <img class="sdk-photo-img" src="/media/sudoku-full.png" alt="Sudoku Race — team vs team" width="1400" height="776" />
+      <button class="hit hit-create" data-act="go-create" aria-label="${esc(t("create"))}"></button>
+      <button class="hit hit-join" data-act="go-join" aria-label="${esc(t("join"))}"></button>
+      <button class="hit hit-solo" data-act="go-solo" aria-label="${esc(t("solo"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-lang="ar" aria-label="العربية"></button>
     </div>
-  `);
+  </div>`;
 }
 
 function renderLobby() {
@@ -570,6 +632,25 @@ function progressPanel() {
     .join("");
 }
 
+// The solo "use a hint" power-up bar. A hint costs coins and can be bought once
+// per game, so the button reflects: already used, can't afford / not logged in,
+// or ready-to-buy (with its price).
+function hintbarHTML() {
+  const cost = state.hintCost || 50;
+  const used = !!myPlayer()?.hintUsed;
+  const loggedIn = !!accountToken();
+  const canAfford = myCoins() >= cost;
+  const disabled = used || buyingHint || !loggedIn || !canAfford;
+  const label = used
+    ? `✓ ${t("hint_used")}`
+    : `${t("use_hint")} · ${cost} 🪙`;
+  return `
+    <div class="sdk-hintbar">
+      <span class="sdk-hintbar-txt">✨ ${t("stuck")}</span>
+      <button class="sdk-hintbar-btn" data-act="hint" ${disabled ? "disabled" : ""}>${label}</button>
+    </div>`;
+}
+
 function renderPlaying() {
   const mt = myTeam();
   $app.innerHTML = shell(`
@@ -580,11 +661,7 @@ function renderPlaying() {
         <div class="sdk-hud-item"><span class="sdk-hud-k">${t("time")}</span><span class="sdk-hud-v" id="sdk-timer">${fmtTime(Date.now() - startLocal)}</span></div>
       </div>
       ${boardHTML()}
-      ${state.solo ? `
-      <div class="sdk-hintbar">
-        <span class="sdk-hintbar-txt">✨ ${t("stuck")}</span>
-        <button class="sdk-hintbar-btn" data-act="hint">${t("use_hint")}</button>
-      </div>` : ""}
+      ${state.solo ? hintbarHTML() : ""}
       ${padHTML()}
       ${state.solo ? "" : `<div class="sdk-hint sdk-center">${t("shared_hint")}</div>`}
       <div class="sdk-progress">
@@ -688,7 +765,7 @@ $app.addEventListener("click", (e) => {
     case "join": return joinRoom();
     case "solo": return startSolo();
     case "start": return socket.emit("sdk_start");
-    case "hint": sfx.point?.(); return socket.emit("sdk_hint");
+    case "hint": return buyHint();
     case "end": return socket.emit("sdk_end");
     case "again":
       // In solo, "play again" spins up a fresh puzzle immediately.
@@ -724,4 +801,5 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+refreshAccount();
 render();

@@ -2,7 +2,7 @@
 // SPILL client. Server owns authoritative room_state; this file renders it and turns
 // clicks into socket events. Fully localized (EN/FR/AR + RTL) via ./i18n.js.
 
-import { sfx, confettiBurst, floatEmoji } from "./effects.js";
+import { sfx, confettiBurst, floatEmoji, flagSVG } from "./effects.js";
 import {
   LANGS, getLang, setLang, applyDir, t, tType, tLetter, tIntensity,
   tPower, tCategory, tErr, tLog,
@@ -182,7 +182,7 @@ function render() {
 /* ---------------- language switcher ---------------- */
 function langBar() {
   return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${getLang() === l.code ? "on" : ""}" data-action="set-lang" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
+    (l) => `<button class="langpill flagpill ${getLang() === l.code ? "on" : ""}" data-action="set-lang" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`
   ).join("")}</div>`;
 }
 function langCycleBtn() {
@@ -252,7 +252,7 @@ function viewPre() {
         <h2 class="display">${t("create_title")}</h2>
         <p class="muted">${t("create_sub")}</p>
         <label class="field">${t("your_name")}
-          <input class="input" id="name-input" maxlength="16" placeholder="${t("name_ph_alex")}" data-draft="name" value="${esc(drafts.name)}" />
+          <div class="input name-chip">${esc(drafts.name || (account && account.name) || "")}</div>
         </label>
         <label class="field">${t("pick_color")}</label>
         ${colorSwatches()}
@@ -269,7 +269,7 @@ function viewPre() {
           <input class="input code-input" id="code-input" maxlength="10" placeholder="SPILL-XXXX" data-draft="joinCode" value="${esc(drafts.joinCode)}" />
         </label>
         <label class="field">${t("your_name")}
-          <input class="input" id="name-input" maxlength="16" placeholder="${t("name_ph_sam")}" data-draft="name" value="${esc(drafts.name)}" />
+          <div class="input name-chip">${esc(drafts.name || (account && account.name) || "")}</div>
         </label>
         <label class="field">${t("pick_color")}</label>
         ${colorSwatches()}
@@ -278,15 +278,22 @@ function viewPre() {
       </div>
     </div>`;
   }
-  return `<div class="screen center-screen hero">
-    ${langBar()}
-    <div class="brand">SPILL</div>
-    <p class="tagline">${t("app_tagline")}</p>
-    <div class="stack" style="max-width:360px;width:100%;margin-top:18px">
-      <button class="btn btn-pink block lg" data-action="goto-create">${t("create_room")}</button>
-      <button class="btn btn-cyan block lg" data-action="goto-join">${t("join_room")}</button>
+  // Show the SPILL.png hero exactly as designed; the "Create/Join" buttons and the
+  // three flags are painted into the image, so we lay transparent clickable
+  // hit-areas over them (positioned in % so they stay aligned at any width).
+  const cur = getLang();
+  // The SPILL.png fills the whole screen (cover). The stage keeps the image's
+  // aspect ratio and is sized to cover the viewport, so the transparent hit-areas
+  // (positioned in % of the image) stay aligned with the painted buttons/flags.
+  return `<div class="spill-fs">
+    <div class="spill-stage">
+      <img class="spill-photo-img" src="/media/spill-full.png" alt="SPILL — truth or dare party game" width="1400" height="780" />
+      <button class="hit hit-create" data-action="goto-create" aria-label="${esc(t("create_room"))}"></button>
+      <button class="hit hit-join" data-action="goto-join" aria-label="${esc(t("join_room"))}"></button>
+      <button class="hit hit-flag hit-en ${cur === "en" ? "on" : ""}" data-action="set-lang" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${cur === "fr" ? "on" : ""}" data-action="set-lang" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${cur === "ar" ? "on" : ""}" data-action="set-lang" data-lang="ar" aria-label="العربية"></button>
     </div>
-    <p class="muted count-hint" style="margin-top:20px">${t("players_range")}</p>
   </div>`;
 }
 
@@ -878,22 +885,26 @@ function onAction(action, el) {
     case "goto-join": pre = "join"; sfx.click(); render(); break;
     case "goto-landing": pre = "landing"; render(); break;
     case "pick-color": drafts.color = el.dataset.color; render(); break;
-    case "create-room":
-      socket.emit("create_room", { name: drafts.name, color: drafts.color, token: accountToken() }, (res) => {
+    case "create-room": {
+      const name = (drafts.name || (account && account.name) || "").trim();
+      socket.emit("create_room", { name, color: drafts.color, token: accountToken() }, (res) => {
         if (res?.ok) { saveSession({ code: res.code, playerId: res.playerId }); applyState(res.state); }
         else if (res?.error === "login_required") { toast(t("login_required"), "error"); forceLogin(); }
         else toast(tErr(res?.error || "Could not create room."), "error");
       });
       break;
-    case "join-room":
+    }
+    case "join-room": {
       if (!drafts.joinCode.trim()) return toast(t("enter_code"), "error");
-      if (!drafts.name.trim()) return toast(t("enter_name"), "error");
-      socket.emit("join_room", { code: drafts.joinCode, name: drafts.name, color: drafts.color, token: accountToken() }, (res) => {
+      const name = (drafts.name || (account && account.name) || "").trim();
+      if (!name) return toast(t("enter_name"), "error");
+      socket.emit("join_room", { code: drafts.joinCode, name, color: drafts.color, token: accountToken() }, (res) => {
         if (res?.ok) { saveSession({ code: res.code, playerId: res.playerId }); applyState(res.state); }
         else if (res?.error === "login_required") { toast(t("login_required"), "error"); forceLogin(); }
         else toast(tErr(res?.error || "Could not join."), "error");
       });
       break;
+    }
     case "set": {
       const key = el.dataset.key;
       if (key === "category") {

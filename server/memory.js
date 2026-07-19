@@ -11,7 +11,7 @@
 // Runs on its own Socket.IO namespace ("/memory") so it never touches SPILL.
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch } from "./accounts.js";
 
 const rooms = new Map(); // code -> MemoryRoom
 let ioNsp = null;
@@ -416,6 +416,12 @@ class MemoryRoom {
         });
       }
     }
+    recordMatch("memory", this.players.map((p) => ({
+      userId: p.userId,
+      name: p.name,
+      team: p.team,
+      won: this.overallWinnerTeam != null && p.team === this.overallWinnerTeam,
+    })));
   }
 
   endByHost(playerId) {
@@ -547,7 +553,13 @@ export function attachMemoryIO(io, serverUrl) {
   // Link a player seat to a logged-in account (optional — guests can still play).
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   // Run a mutating handler, surface {error}, then broadcast.
@@ -572,6 +584,7 @@ export function attachMemoryIO(io, serverUrl) {
 
     socket.on("mem_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "mem_err_login" });
         const { room, player } = createMemoryRoom(payload.name, payload.color);
         bind(socket, room, player);
         linkAccount(player, payload.token);
@@ -585,6 +598,7 @@ export function attachMemoryIO(io, serverUrl) {
 
     socket.on("mem_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "mem_err_login" });
         const room = getMemoryRoom(payload.code);
         if (!room) return ack(cb, { error: "mem_err_no_code" });
 

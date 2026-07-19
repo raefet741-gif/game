@@ -14,7 +14,7 @@
 // same board. Runs on its own Socket.IO namespace ("/zip").
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch } from "./accounts.js";
 
 const rooms = new Map(); // code -> ZipRoom
 let ioNsp = null;
@@ -510,6 +510,14 @@ class ZipRoom {
         });
       }
     }
+    if (!this.solo) {
+      recordMatch("zip", this.players.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        team: p.team,
+        won: p.team === this.winnerTeam,
+      })));
+    }
   }
 
   playAgain(playerId) {
@@ -646,7 +654,13 @@ export function attachZipIO(io, serverUrl) {
   // accounts earn coins + XP).
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   function handle(socket, fn) {
@@ -670,6 +684,7 @@ export function attachZipIO(io, serverUrl) {
 
     socket.on("zip_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "zip_err_login" });
         const { room, player } = createZipRoom(payload.name, payload.color);
         bind(socket, room, player);
         linkAccount(player, payload.token);
@@ -683,6 +698,7 @@ export function attachZipIO(io, serverUrl) {
 
     socket.on("zip_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "zip_err_login" });
         const room = getZipRoom(payload.code);
         if (!room) return ack(cb, { error: "zip_err_no_code" });
 

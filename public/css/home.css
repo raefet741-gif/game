@@ -48,6 +48,76 @@ html[lang="ar"] .home-body { font-family: "Cairo", "Space Grotesk", sans-serif; 
   z-index: 70;
 }
 
+/* Language flag dropdown — the current flag + a pick-list of all languages.
+   Used in the auth corner and the games-screen header. */
+.langpick { position: relative; z-index: 90; }
+.langpick-cur {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(26, 21, 18, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: #17120f;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-family: var(--font-d);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.langpick-cur:hover { background: #fff; }
+.langpick-code { letter-spacing: 0.04em; }
+.langpick-caret { font-style: normal; font-size: 10px; opacity: 0.55; transition: transform 0.18s ease; }
+.langpick.open .langpick-caret { transform: rotate(180deg); }
+.langpick-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  inset-inline-end: 0;
+  min-width: 168px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: #fbf7ef;
+  border: 1px solid rgba(26, 21, 18, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px -14px rgba(26, 21, 18, 0.45);
+  z-index: 95;
+  animation: kz-fade 0.16s ease both;
+}
+.langpick.open .langpick-menu { display: flex; }
+.langpick-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-family: var(--font-d);
+  font-weight: 600;
+  font-size: 14px;
+  color: #17120f;
+  text-align: start;
+  cursor: pointer;
+}
+.langpick-item:hover { background: rgba(26, 21, 18, 0.06); }
+.langpick-item.on { background: rgba(193, 39, 45, 0.1); color: var(--red); }
+.flag {
+  width: 24px;
+  height: 16px;
+  flex: none;
+  display: block;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(26, 21, 18, 0.12);
+}
+.langpick-cur .flag { width: 22px; height: 15px; }
+html[lang="ar"] .langpick-item { font-family: "Cairo", sans-serif; }
+html[dir="rtl"] .langpick-menu { inset-inline-end: auto; inset-inline-start: 0; }
+
 /* shared kanji eyebrow */
 .kz-kanji {
   font-size: 13px;
@@ -313,6 +383,9 @@ html[lang="ar"] .kz-logo { font-family: "Cairo", serif; font-weight: 900; }
 }
 .kz-logo.sm { position: static; margin: 0; transform: none; font-family: var(--font-d); font-weight: 800; font-size: 20px; color: #17120f; text-shadow: none; display: flex; align-items: center; gap: 8px; }
 .kz-logo.sm span { color: var(--red); text-shadow: none; }
+/* Brand mark (Logo.png) in the top-left header — replaces the KyuubiZ wordmark. */
+.kz-logo-chip { display: block; width: 100px; height: auto; object-fit: contain; }
+html[dir="rtl"] .kz-logo.sm { justify-content: flex-end; }
 .kz-nav { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .kz-main { position: relative; z-index: 5; max-width: 1180px; margin: 0 auto; padding: clamp(28px, 5vw, 60px) clamp(16px, 4vw, 48px) 72px; }
 .kz-main-head {
@@ -469,6 +542,25 @@ html[lang="ar"] .kz-game-name { font-family: "Cairo", serif; font-weight: 900; }
 }
 .lb-game:hover { transform: translateY(-1px); }
 .lb-game.on { background: rgba(193, 39, 45, 0.12); border-color: transparent; box-shadow: 0 0 0 2px var(--red); }
+
+/* match history rows */
+.hist-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.hist-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 14px; background: rgba(26, 21, 18, 0.03);
+  border: 1px solid var(--line); border-inline-start: 4px solid var(--muted);
+}
+.hist-row.win { border-inline-start-color: #2f9e44; }
+.hist-row.loss { border-inline-start-color: var(--red); }
+.hist-emoji { font-size: 20px; line-height: 1; }
+.hist-main { flex: 1; min-width: 0; }
+.hist-top { display: flex; align-items: center; gap: 8px; }
+.hist-game { font-weight: 700; color: #17120f; }
+.hist-res { font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
+.hist-res.w { color: #2f9e44; background: rgba(47, 158, 68, 0.14); }
+.hist-res.l { color: var(--red); background: rgba(193, 39, 45, 0.12); }
+.hist-vs { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-time { font-size: 11px; color: var(--muted); white-space: nowrap; text-align: end; }
 
 .gl-list { display: flex; flex-direction: column; gap: 6px; }
 .gl-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: rgba(26, 21, 18, 0.03); border: 1px solid var(--line); }

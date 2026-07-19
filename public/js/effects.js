@@ -157,3 +157,19 @@ export function floatEmoji(emoji, color) {
 }
 
 export const motionReduced = reduceMotion;
+
+/* ------------------------------------------------------------------
+ * Language flags — small inline SVGs shared by every game's language
+ * switcher. Inline SVG (not emoji) because desktop Windows/Chrome renders
+ * regional flag emoji as plain letter codes ("TN", "FR"), which looks broken.
+ *   • en → England (St George's cross)   • fr → France   • ar → Tunisia
+ * All use a 3:2 viewBox so they line up at a uniform size.
+ * ------------------------------------------------------------------ */
+export function flagSVG(code) {
+  if (code === "fr")
+    return `<svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#fff"/><rect width="1" height="2" fill="#0055A4"/><rect x="2" width="1" height="2" fill="#EF4135"/></svg>`;
+  if (code === "en")
+    return `<svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#fff"/><rect x="12" width="6" height="20" fill="#CE1124"/><rect y="7" width="30" height="6" fill="#CE1124"/></svg>`;
+  // ar → Tunisia: red field, white disc, red crescent + red five-point star.
+  return `<svg class="flag" viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#E70013"/><circle cx="15" cy="10" r="6" fill="#fff"/><circle cx="15" cy="10" r="4.6" fill="#E70013"/><circle cx="16.6" cy="10" r="3.7" fill="#fff"/><polygon points="17.6,7.6 18.14,9.26 19.88,9.26 18.47,10.28 19.01,11.94 17.6,10.92 16.19,11.94 16.73,10.28 15.32,9.26 17.06,9.26" fill="#E70013"/></svg>`;
+}

@@ -3,7 +3,7 @@
 // renders the crossword grid + letter wheel, turns swipes into words, and shows
 // each mode's race. Answers never arrive until they're found, so no peeking.
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/words", { reconnection: true });
 const $app = document.getElementById("app");
@@ -203,13 +203,23 @@ function getToken() { return localStorage.getItem("kyuubi.token"); }
 // power-up cards. Guests (no token) stay null and just see a "log in" prompt.
 function refreshAccount() {
   const token = getToken();
-  if (!token) { account = null; return Promise.resolve(); }
+  // Login is required to play — bounce guests back to the home page.
+  if (!token) { location.replace("/"); return Promise.resolve(); }
   return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
     .then((r) => (r.ok ? r.json() : null))
-    .then((d) => { account = (d && d.profile) || null; if (state) render(); })
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      // The name always comes from the signed-in profile — players never retype it.
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      render();
+    })
     .catch(() => {});
 }
 function myCoins() { return account ? account.coins || 0 : 0; }
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -429,7 +439,7 @@ function liveTime() {
 
 /* ---------------- actions ---------------- */
 function createRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("wow_create", { name, color: drafts.color, token: getToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -590,7 +600,7 @@ function drawWheelLive() {
 /* ---------------- render ---------------- */
 function langBar() {
   return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
+    (l) => `<button class="langpill flagpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`
   ).join("")}</div>`;
 }
 function colorDots(selected) {
@@ -625,7 +635,7 @@ function renderPre() {
         <button class="ww-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="ww-h2">${isCreate ? t("create") : t("join")}</h2>
         <label class="ww-label">${t("your_name")}</label>
-        <input class="ww-input" id="ww-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="ww-input ww-name-chip">${esc(myName())}</div>
         ${isCreate ? "" : `
           <label class="ww-label">${t("room_code")}</label>
           <input class="ww-input" id="ww-code" maxlength="12" value="${esc(drafts.joinCode)}" placeholder="WOW-ABCD" style="text-transform:uppercase" />`}
@@ -636,17 +646,19 @@ function renderPre() {
     `);
     return;
   }
-  $app.innerHTML = shell(`
-    <div class="ww-hero">
-      <div class="ww-emoji">🔤</div>
-      <h1 class="ww-brand">${t("brand")}</h1>
-      <p class="ww-tagline">${t("tagline")}</p>
-      <div class="ww-cta-row">
-        <button class="ww-btn primary" data-act="go-create">${t("create")}</button>
-        <button class="ww-btn ghost" data-act="go-join">${t("join")}</button>
-      </div>
+  // Full-screen word.png wallpaper. The Create/Join buttons and flags are painted
+  // into the image; transparent %-positioned hit-areas (shared .hit classes,
+  // words positions under .ww-fs) sit over them.
+  $app.innerHTML = `<div class="ww-fs">
+    <div class="ww-stage">
+      <img class="ww-photo-img" src="/media/words-full.png" alt="Word Wonders — swipe to spell" width="1400" height="778" />
+      <button class="hit hit-create" data-act="go-create" aria-label="${esc(t("create"))}"></button>
+      <button class="hit hit-join" data-act="go-join" aria-label="${esc(t("join"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-lang="ar" aria-label="العربية"></button>
     </div>
-  `);
+  </div>`;
 }
 
 function renderLobby() {

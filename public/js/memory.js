@@ -4,7 +4,7 @@
 // taps into mem_flip events. Card faces are revealed one at a time by the
 // server (mem_reveal), so a client can never peek at the whole board.
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/memory", { reconnection: true });
 const $app = document.getElementById("app");
@@ -55,7 +55,7 @@ const T = {
     reconnecting: "Reconnecting…", removed: "Room closed.",
     err_locked: "Can't change that after the game starts.",
     err_started: "That game already started.", err_no_code: "No room with that code.",
-    err_generic: "Something glitched — try again.",
+    err_generic: "Something glitched — try again.", err_login: "Please log in from the home page to play.",
   },
   fr: {
     brand: "MEMORY MATCH",
@@ -79,7 +79,7 @@ const T = {
     reconnecting: "Reconnexion…", removed: "Salon fermé.",
     err_locked: "Impossible de changer ça une fois lancé.",
     err_started: "La partie a déjà commencé.", err_no_code: "Aucun salon avec ce code.",
-    err_generic: "Un bug — réessaie.",
+    err_generic: "Un bug — réessaie.", err_login: "Connecte-toi depuis l'accueil pour jouer.",
   },
   ar: {
     brand: "لعبة الذاكرة",
@@ -103,7 +103,7 @@ const T = {
     reconnecting: "إعادة الاتصال…", removed: "أُغلقت الغرفة.",
     err_locked: "لا يمكن تغيير ذلك بعد بدء اللعبة.",
     err_started: "بدأت اللعبة بالفعل.", err_no_code: "لا توجد غرفة بهذا الرمز.",
-    err_generic: "حدث خلل — حاول مجددًا.",
+    err_generic: "حدث خلل — حاول مجددًا.", err_login: "سجّل الدخول من الصفحة الرئيسية للعب.",
   },
 };
 const t = (k) => (T[lang] || T.en)[k] || T.en[k] || k;
@@ -115,6 +115,7 @@ const ERR_MAP = {
   mem_err_need_teams: "need_teams",
   mem_err_started: "err_started",
   mem_err_no_code: "err_no_code",
+  mem_err_login: "err_login",
 };
 function tErr(key) {
   return t(ERR_MAP[key] || "err_generic");
@@ -128,6 +129,27 @@ function loadSession() {
 function saveSession(s) { session = s; localStorage.setItem("memory.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("memory.session"); }
 function accountToken() { return localStorage.getItem("kyuubi.token") || null; }
+
+// Logged-in profile ({name, color, ...}) or null. Login is required to play, so
+// this is populated on boot and guests are bounced to the home page.
+let account = null;
+function refreshAccount() {
+  const token = accountToken();
+  if (!token) { location.replace("/"); return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      // The name always comes from the signed-in profile — players never retype it.
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      render();
+    })
+    .catch(() => {});
+}
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -291,7 +313,7 @@ function liveTime() {
 
 /* ---------------- actions ---------------- */
 function createRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("mem_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -300,7 +322,7 @@ function createRoom() {
   });
 }
 function joinRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   const code = (drafts.joinCode || "").trim().toUpperCase();
   if (!name) return toast(t("your_name"), "error");
   if (!code) return toast(t("room_code"), "error");
@@ -323,7 +345,7 @@ function flipCard(i) {
 /* ---------------- render ---------------- */
 function langBar() {
   return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
+    (l) => `<button class="langpill flagpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`
   ).join("")}</div>`;
 }
 function colorDots(selected) {
@@ -349,7 +371,7 @@ function renderPre() {
         <button class="mm-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="mm-h2">${isCreate ? t("create") : t("join")}</h2>
         <label class="mm-label">${t("your_name")}</label>
-        <input class="mm-input" id="mm-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="mm-input mm-name-chip">${esc(myName())}</div>
         ${isCreate ? "" : `
           <label class="mm-label">${t("room_code")}</label>
           <input class="mm-input" id="mm-code" maxlength="12" value="${esc(drafts.joinCode)}" placeholder="MEM-ABCD" style="text-transform:uppercase" />`}
@@ -360,17 +382,19 @@ function renderPre() {
     `);
     return;
   }
-  $app.innerHTML = shell(`
-    <div class="mm-hero">
-      <div class="mm-emoji">🧠</div>
-      <h1 class="mm-brand">${t("brand")}</h1>
-      <p class="mm-tagline">${t("tagline")}</p>
-      <div class="mm-cta-row">
-        <button class="mm-btn primary" data-act="go-create">${t("create")}</button>
-        <button class="mm-btn ghost" data-act="go-join">${t("join")}</button>
-      </div>
+  // Full-screen memory-match.png wallpaper. The Create/Join buttons and flags are
+  // painted into the image; transparent %-positioned hit-areas (shared .hit
+  // classes) sit over them. Flags are nudged via .mem-fs overrides.
+  $app.innerHTML = `<div class="mem-fs">
+    <div class="mem-stage">
+      <img class="mem-photo-img" src="/media/memory-full.png" alt="Memory Match — team memory race" width="1400" height="776" />
+      <button class="hit hit-create" data-act="go-create" aria-label="${esc(t("create"))}"></button>
+      <button class="hit hit-join" data-act="go-join" aria-label="${esc(t("join"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-lang="ar" aria-label="العربية"></button>
     </div>
-  `);
+  </div>`;
 }
 
 function shell(inner) {
@@ -658,4 +682,5 @@ $app.addEventListener("click", (e) => {
   }
 });
 
+refreshAccount();
 render();

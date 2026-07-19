@@ -20,7 +20,7 @@
 // Socket.IO namespace ("/words").
 
 import crypto from "crypto";
-import { userFromToken, grantReward, spendCoins } from "./accounts.js";
+import { userFromToken, grantReward, spendCoins, recordMatch } from "./accounts.js";
 import { WORD_LIST } from "./words-data.js";
 
 // The dictionary is English. Exposed to clients (in state) so the board can show
@@ -60,16 +60,25 @@ export const TEAM_DEFS = [
 
 export const MODES = ["solo", "versus", "teams"];
 
-// Difficulty → base word length + how many crossword words to aim for + grid cap.
+// Difficulty → base word length(s) + how many crossword words to aim for + grid
+// cap. `baseLen` may be an array: one is picked at random per round so the wheel
+// (and the whole puzzle) is sometimes short, sometimes long. `vary: true` keeps
+// the crossword words in a mixed order instead of forcing the longest ones in —
+// so easy/medium boards get a natural spread of short (3-letter) and long words
+// rather than being packed with only the longest words. Hard stays dense/long.
 export const DIFFICULTIES = {
-  easy: { baseLen: 6, minWords: 4, maxWords: 6, maxGrid: 9 },
-  medium: { baseLen: 7, minWords: 5, maxWords: 8, maxGrid: 10 },
-  hard: { baseLen: 7, minWords: 6, maxWords: 10, maxGrid: 11 },
+  easy: { baseLen: [4, 5, 6], minWords: 4, maxWords: 6, maxGrid: 9, vary: true },
+  medium: { baseLen: [5, 6, 7], minWords: 5, maxWords: 8, maxGrid: 10, vary: true },
+  hard: { baseLen: 7, minWords: 6, maxWords: 10, maxGrid: 11, vary: false },
 };
 
 // Reward economy (per whole game).
 const REWARD_WIN = { coins: 50, xp: 25 };
 const REWARD_PLAYED = { coins: 10, xp: 5 };
+// Each extra (non-crossword) word a player spells pays a little on top: half a
+// coin and a sliver of XP per bonus word, tallied up when the game ends.
+const BONUS_COIN = 0.5;
+const BONUS_XP = 1;
 
 // ---------------------------------------------------------------------------
 // Dictionary — clean, de-duplicated, length 3–7, indexed by base length.
@@ -233,17 +242,24 @@ function buildCrossword(words, maxWords) {
 
 // Build one full puzzle for a difficulty, or null if this attempt was poor.
 function tryPuzzle(cfg) {
-  const pool = BASES[cfg.baseLen];
+  // baseLen may be a single length or a list to pick from (variety per round).
+  const baseLen = Array.isArray(cfg.baseLen)
+    ? cfg.baseLen[Math.floor(Math.random() * cfg.baseLen.length)]
+    : cfg.baseLen;
+  const pool = BASES[baseLen];
   if (!pool || !pool.length) return null;
   const base = pool[Math.floor(Math.random() * pool.length)];
   const formable = formableWords(base);
   if (formable.length < cfg.minWords + 2) return null;
 
-  // Shuffle everything after the base word so puzzles vary, but keep the base
-  // (a longest word) first so it anchors the crossword.
-  const candidates = [formable[0], ...shuffle(formable.slice(1)).sort(
-    (a, b) => b.length - a.length
-  )];
+  // Keep the base (a longest word) first so it anchors the crossword. For the
+  // rest: `vary` difficulties keep them in random length order so the board gets
+  // a mix of short and long words; otherwise pack longest-first for a denser,
+  // harder puzzle.
+  const rest = shuffle(formable.slice(1));
+  const candidates = cfg.vary
+    ? [formable[0], ...rest]
+    : [formable[0], ...rest.sort((a, b) => b.length - a.length)];
   const cw = buildCrossword(candidates, cfg.maxWords);
   if (cw.slots.length < cfg.minWords) return null;
   if (cw.rows > cfg.maxGrid || cw.cols > cfg.maxGrid) return null;
@@ -761,9 +777,14 @@ class WordsRoom {
       if (!p.userId) continue;
       const won = isWinner(p);
       const r = won ? REWARD_WIN : REWARD_PLAYED;
+      // Bonus words each pay half a coin + a little XP, on top of the base reward.
+      // Coins are stored as integers, so round the combined totals (fractional
+      // bonus coins accumulate — two bonus words = one real coin).
+      const coins = Math.round(r.coins + p.totalBonus * BONUS_COIN);
+      const xp = Math.round(r.xp + p.totalBonus * BONUS_XP);
       const res = grantReward(p.userId, {
-        coinGain: r.coins + p.totalBonus * 2, // bonus words pay a little extra
-        xpGain: r.xp,
+        coinGain: coins,
+        xpGain: xp,
         won,
         played: true,
         mode: this.settings.mode === "solo" ? "solo" : "versus",
@@ -771,13 +792,22 @@ class WordsRoom {
       });
       if (res && p.socketId && ioNsp) {
         ioNsp.to(p.socketId).emit("wow_reward", {
-          coins: r.coins + p.totalBonus * 2,
-          xp: r.xp,
+          coins,
+          xp,
           won,
           profile: res.profile,
           unlocked: res.unlocked,
         });
       }
+    }
+    if (this.settings.mode !== "solo") {
+      const teamMode = this.settings.mode === "teams";
+      recordMatch("words", this.players.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        team: teamMode ? p.team : null, // versus is free-for-all
+        won: isWinner(p),
+      })));
     }
   }
 
@@ -955,7 +985,13 @@ export function attachWordsIO(io, serverUrl) {
 
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   function handle(socket, fn) {
@@ -979,6 +1015,7 @@ export function attachWordsIO(io, serverUrl) {
 
     socket.on("wow_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "wow_err_login" });
         const { room, player } = createWordsRoom(payload.name, payload.color);
         bind(socket, room, player);
         linkAccount(player, payload.token);
@@ -992,6 +1029,7 @@ export function attachWordsIO(io, serverUrl) {
 
     socket.on("wow_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "wow_err_login" });
         const room = getWordsRoom(payload.code);
         if (!room) return ack(cb, { error: "wow_err_no_code" });
 

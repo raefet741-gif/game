@@ -7,7 +7,7 @@
 // re-render — or a reconnect — can rebuild it pixel-for-pixel, and teammate
 // strokes can be merged in live.
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/draw", { reconnection: true });
 const $app = document.getElementById("app");
@@ -86,7 +86,7 @@ const T = {
     err_locked: "Can't change that after the game starts.",
     err_started: "That game already started.", err_no_code: "No room with that code.",
     err_own_vote: "You can't vote for your own drawing.",
-    err_generic: "Something glitched — try again.",
+    err_generic: "Something glitched — try again.", err_login: "Please log in from the home page to play.",
   },
   fr: {
     brand: "DOODLE DUEL", tagline: "Dessine, devine, gagne. Croque un mot ou fais tourner les dessins.",
@@ -137,7 +137,7 @@ const T = {
     err_locked: "Impossible de changer ça une fois lancé.",
     err_started: "La partie a déjà commencé.", err_no_code: "Aucun salon avec ce code.",
     err_own_vote: "Tu ne peux pas voter pour ton dessin.",
-    err_generic: "Un bug — réessaie.",
+    err_generic: "Un bug — réessaie.", err_login: "Connecte-toi depuis l'accueil pour jouer.",
   },
   ar: {
     brand: "DOODLE DUEL", tagline: "ارسم، خمّن، اربح. ارسم كلمة أو مرّر الرسوم في الحلقة.",
@@ -188,7 +188,7 @@ const T = {
     err_locked: "لا يمكن تغيير ذلك بعد البدء.",
     err_started: "بدأت اللعبة بالفعل.", err_no_code: "لا توجد غرفة بهذا الرمز.",
     err_own_vote: "لا يمكنك التصويت لرسمتك.",
-    err_generic: "حدث خلل — حاول مجددًا.",
+    err_generic: "حدث خلل — حاول مجددًا.", err_login: "سجّل الدخول من الصفحة الرئيسية للعب.",
   },
 };
 const t = (k) => (T[lang] || T.en)[k] ?? T.en[k] ?? k;
@@ -197,6 +197,7 @@ const ERR_MAP = {
   dd_err_need_players: "need_players", dd_err_need_teams: "need_teams",
   dd_err_need_relay: "need_relay", dd_err_started: "err_started",
   dd_err_no_code: "err_no_code", dd_err_own_vote: "err_own_vote",
+  dd_err_login: "err_login",
 };
 const tErr = (key) => t(ERR_MAP[key] || "err_generic");
 
@@ -216,6 +217,24 @@ let session = loadSession();
 let pre = "landing"; // landing | create | join
 let drafts = { name: "", color: "", joinCode: "" };
 let account = null;
+// Login is required to play — bounce guests to the home page, and take the name
+// straight from the signed-in profile so players never retype it.
+function refreshAccount() {
+  const token = getToken();
+  if (!token) { location.replace("/"); return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      fullRender();
+    })
+    .catch(() => {});
+}
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 // The private prompt/turn info delivered per-socket (never in shared state).
 let myWord = null;        // sketch: the word to draw
@@ -439,7 +458,7 @@ function softUpdate() {
 function topBar() {
   return `<div class="dd-row dd-spread" style="margin-bottom:6px">
     <span class="dd-muted" style="font-weight:700">🎨 DOODLE DUEL</span>
-    <div class="dd-seg" style="padding:3px">${LANGS.map((l) => `<button class="${lang === l.code ? "on" : ""}" data-act="lang" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`).join("")}</div>
+    <div class="dd-seg dd-seg-flags" style="padding:3px">${LANGS.map((l) => `<button class="${lang === l.code ? "on" : ""}" data-act="lang" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`).join("")}</div>
   </div>`;
 }
 function colorSwatches(sel) {
@@ -454,21 +473,26 @@ function renderPre() {
       <div class="dd-card">
         <button class="btn btn-ghost sm" data-act="pre-back" style="margin-bottom:8px">‹ ${t("back")}</button>
         <label class="dd-field"><span>${t("your_name")}</span>
-          <input class="dd-input" id="dd-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" /></label>
+          <div class="dd-input dd-name-chip">${esc(myName())}</div></label>
         ${joining ? `<label class="dd-field"><span>${t("room_code")}</span>
           <input class="dd-input" id="dd-code" maxlength="8" style="text-transform:uppercase" value="${esc(drafts.joinCode)}" placeholder="DOO-XXXX" /></label>` : ""}
         <label class="dd-field"><span>${t("pick_color")}</span>${colorSwatches(drafts.color)}</label>
         <button class="btn btn-pink block lg" data-act="${joining ? "do-join" : "do-create"}" style="margin-top:8px">${joining ? t("join_go") : t("create_go")}</button>
       </div>`;
   }
-  return `${topBar()}
-    <div style="text-align:center;font-size:56px;margin-top:10px">🎨</div>
-    <h1 class="dd-brand">${t("brand")}</h1>
-    <p class="dd-tag">${t("tagline")}</p>
-    <div class="dd-card">
-      <button class="btn btn-pink block lg" data-act="pre-create">✏️ ${t("create")}</button>
-      <button class="btn btn-cyan block lg" data-act="pre-join" style="margin-top:10px">🔑 ${t("join")}</button>
-    </div>`;
+  // Full-screen doodle.png wallpaper. The Create/Join buttons and flags are
+  // painted into the image; transparent %-positioned hit-areas (shared .hit
+  // classes, doodle positions under .dd-fs) sit over them.
+  return `<div class="dd-fs">
+    <div class="dd-stage">
+      <img class="dd-photo-img" src="/media/doodle-full.png" alt="Doodle Duel — draw, guess, win" width="1400" height="788" />
+      <button class="hit hit-create" data-act="pre-create" aria-label="${esc(t("create"))}"></button>
+      <button class="hit hit-join" data-act="pre-join" aria-label="${esc(t("join"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-act="lang" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-act="lang" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-act="lang" data-lang="ar" aria-label="العربية"></button>
+    </div>
+  </div>`;
 }
 
 /* ---------------- lobby ---------------- */
@@ -955,12 +979,12 @@ const onAct = {
   "pre-back": () => { pre = "landing"; fullRender(); },
   "pick-color": (el) => { drafts.color = el.dataset.color; fullRender(); },
   "do-create": () => {
-    drafts.name = (document.getElementById("dd-name")?.value || "").trim();
+    drafts.name = (myName() || "").trim();
     if (!drafts.name) return toast(t("your_name"), "err");
     socket.emit("dd_create", { name: drafts.name, color: drafts.color, token: getToken(), lang }, joinCb);
   },
   "do-join": () => {
-    drafts.name = (document.getElementById("dd-name")?.value || "").trim();
+    drafts.name = (myName() || "").trim();
     drafts.joinCode = (document.getElementById("dd-code")?.value || "").trim().toUpperCase();
     if (!drafts.name || !drafts.joinCode) return toast(t("your_name"), "err");
     socket.emit("dd_join", { code: drafts.joinCode, name: drafts.name, color: drafts.color, token: getToken(), lang }, joinCb);
@@ -1015,4 +1039,5 @@ function joinCb(res) {
 /* ---------------- boot ---------------- */
 document.documentElement.lang = lang;
 document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+refreshAccount();
 fullRender();

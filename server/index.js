@@ -45,6 +45,7 @@ import {
   userFromToken,
   leaderboard,
   gameLeaderboard,
+  historyFor,
   recordSoloWin,
   ACHIEVEMENTS,
   RANKED_GAMES,
@@ -113,6 +114,12 @@ app.get("/api/me", (req, res) => {
   res.json({ ok: true, profile });
 });
 app.get("/api/achievements", (_req, res) => res.json({ achievements: ACHIEVEMENTS }));
+// The logged-in player's match history (wins/losses, opponents, when), newest first.
+app.get("/api/history", (req, res) => {
+  const user = userFromToken(bearer(req));
+  if (!user) return res.status(401).json({ error: "no_session" });
+  res.json({ ok: true, history: historyFor(user.id) });
+});
 // Two flavours of board:
 //   ?game=<id>  — that game's OWN ranked board (zero-sum win/loss points)
 //   ?mode=…     — cross-game XP board: versus | solo | overall (legacy)
@@ -260,6 +267,9 @@ function linkAccount(socket, player, token) {
   if (user) {
     player.userId = user.id;
     socket.data.userId = user.id;
+    // The profile name is authoritative — players carry their account name into
+    // every game rather than typing a fresh one each time.
+    player.name = user.name;
   }
 }
 

@@ -22,7 +22,7 @@
 // prompt). Mirrors the thin socket style of server/words.js & server/sudoku.js.
 
 import crypto from "crypto";
-import { userFromToken, grantReward } from "./accounts.js";
+import { userFromToken, grantReward, recordMatch } from "./accounts.js";
 import { pickWords, label } from "./draw-words.js";
 
 const rooms = new Map(); // code -> DrawRoom
@@ -900,6 +900,16 @@ class DrawRoom {
         });
       }
     }
+    const solo = this.settings.game === "sketch" && this.settings.mode === "solo";
+    if (!solo) {
+      const teamMode = !!(champ && champ.kind === "team");
+      recordMatch("draw", this.players.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        team: teamMode ? p.team : null,
+        won: isWinner(p),
+      })));
+    }
   }
 
   playAgain(playerId) {
@@ -1084,7 +1094,13 @@ export function attachDrawIO(io, serverUrl) {
 
   function linkAccount(player, token) {
     const user = userFromToken(token);
-    if (user) player.userId = user.id;
+    if (user) {
+      player.userId = user.id;
+      // The profile name is authoritative — players carry their account name into
+      // every game rather than typing a fresh one each time.
+      player.name = user.name;
+    }
+    return user;
   }
 
   function handle(socket, fn) {
@@ -1108,6 +1124,7 @@ export function attachDrawIO(io, serverUrl) {
 
     socket.on("dd_create", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "dd_err_login" });
         const { room, player } = createDrawRoom(payload.name, payload.color);
         bind(socket, room, player, payload.lang);
         linkAccount(player, payload.token);
@@ -1121,6 +1138,7 @@ export function attachDrawIO(io, serverUrl) {
 
     socket.on("dd_join", (payload = {}, cb) => {
       try {
+        if (!userFromToken(payload.token)) return ack(cb, { error: "dd_err_login" });
         const room = getDrawRoom(payload.code);
         if (!room) return ack(cb, { error: "dd_err_no_code" });
 

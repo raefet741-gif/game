@@ -5,7 +5,7 @@
 // taps into queens_set events. Opponents only ever see progress + times, never the
 // marks — so nobody can copy. Racing is best-of-N by fastest cumulative time.
 
-import { sfx, confettiBurst } from "./effects.js";
+import { sfx, confettiBurst, flagSVG } from "./effects.js";
 
 const socket = io("/queens", { reconnection: true });
 const $app = document.getElementById("app");
@@ -35,7 +35,7 @@ function setLang(code) {
 
 const T = {
   en: {
-    brand: "KYUUBI QUEENS",
+    brand: "QUEENS",
     tagline: "One crown per row, column & color — none touching. Race best-of-N.",
     create: "Create room", join: "Join room", solo: "Play solo", back: "Back",
     solo_title: "Solo puzzle", solo_start: "Start puzzle",
@@ -62,10 +62,10 @@ const T = {
     reconnecting: "Reconnecting…",
     err_locked: "Can't change that after the game starts.",
     err_started: "That game already started.", err_no_code: "No room with that code.",
-    err_generic: "Something glitched — try again.",
+    err_generic: "Something glitched — try again.", err_login: "Please log in from the home page to play.",
   },
   fr: {
-    brand: "KYUUBI QUEENS",
+    brand: "QUEENS",
     tagline: "Une couronne par ligne, colonne et couleur — sans se toucher. Au meilleur de N.",
     create: "Créer un salon", join: "Rejoindre", solo: "Jouer solo", back: "Retour",
     solo_title: "Grille solo", solo_start: "Commencer",
@@ -92,10 +92,10 @@ const T = {
     reconnecting: "Reconnexion…",
     err_locked: "Impossible de changer ça une fois lancé.",
     err_started: "La partie a déjà commencé.", err_no_code: "Aucun salon avec ce code.",
-    err_generic: "Un bug — réessaie.",
+    err_generic: "Un bug — réessaie.", err_login: "Connecte-toi depuis l'accueil pour jouer.",
   },
   ar: {
-    brand: "ملكات كيوبي",
+    brand: "ملكات",
     tagline: "تاج واحد لكل صف وعمود ولون — دون أن يتلامسا. الأفضل من N.",
     create: "إنشاء غرفة", join: "انضمام", solo: "العب منفردًا", back: "رجوع",
     solo_title: "لغز فردي", solo_start: "ابدأ اللغز",
@@ -122,7 +122,7 @@ const T = {
     reconnecting: "إعادة الاتصال…",
     err_locked: "لا يمكن تغيير ذلك بعد بدء اللعبة.",
     err_started: "بدأت اللعبة بالفعل.", err_no_code: "لا توجد غرفة بهذا الرمز.",
-    err_generic: "حدث خلل — حاول مجددًا.",
+    err_generic: "حدث خلل — حاول مجددًا.", err_login: "سجّل الدخول من الصفحة الرئيسية للعب.",
   },
 };
 const t = (k) => (T[lang] || T.en)[k] || T.en[k] || k;
@@ -134,6 +134,7 @@ const ERR_MAP = {
   q_err_need_teams: "need_teams",
   q_err_started: "err_started",
   q_err_no_code: "err_no_code",
+  q_err_login: "err_login",
 };
 function tErr(key) {
   return t(ERR_MAP[key] || "err_generic");
@@ -154,6 +155,27 @@ function loadSession() {
 function saveSession(s) { session = s; localStorage.setItem("queens.session", JSON.stringify(s)); }
 function clearSession() { session = null; localStorage.removeItem("queens.session"); }
 function accountToken() { return localStorage.getItem("kyuubi.token") || null; }
+
+// Logged-in profile ({name, color, ...}) or null. Login is required to play, so
+// this is populated on boot and guests are bounced to the home page.
+let account = null;
+function refreshAccount() {
+  const token = accountToken();
+  if (!token) { location.replace("/"); return Promise.resolve(); }
+  return fetch("/api/me", { headers: { Authorization: "Bearer " + token } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      account = (d && d.profile) || null;
+      if (!account) { location.replace("/"); return; } // expired / invalid token
+      // The name always comes from the signed-in profile — players never retype it.
+      drafts.name = account.name;
+      if (!drafts.color && account.color) drafts.color = account.color;
+      render();
+    })
+    .catch(() => {});
+}
+// Display name for the pre-game forms: always the signed-in profile name.
+function myName() { return (account && account.name) || drafts.name || ""; }
 
 /* ---------------- state ---------------- */
 let config = { colors: [], serverUrl: "" };
@@ -309,7 +331,7 @@ function stopTick() {
 
 /* ---------------- actions ---------------- */
 function createRoom() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("queens_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -330,7 +352,7 @@ function joinRoom() {
 }
 // Solo: create a private room, set difficulty/rounds, and start alone in one step.
 function startSolo() {
-  const name = (drafts.name || "").trim();
+  const name = (myName() || "").trim();
   if (!name) return toast(t("your_name"), "error");
   socket.emit("queens_create", { name, color: drafts.color, token: accountToken() }, (res) => {
     if (!res?.ok) return toast(tErr(res?.error), "error");
@@ -355,7 +377,7 @@ function tapCell(i) {
 /* ---------------- render ---------------- */
 function langBar() {
   return `<div class="langbar">${LANGS.map(
-    (l) => `<button class="langpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}">${l.code === "ar" ? "ع" : l.code.toUpperCase()}</button>`
+    (l) => `<button class="langpill flagpill ${lang === l.code ? "on" : ""}" data-lang="${l.code}" aria-label="${l.code}">${flagSVG(l.code)}</button>`
   ).join("")}</div>`;
 }
 function colorDots(selectedColor) {
@@ -400,7 +422,7 @@ function renderPre() {
         <button class="q-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="q-h2">${t("solo_title")}</h2>
         <label class="q-label">${t("your_name")}</label>
-        <input class="q-input" id="q-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="q-input q-name-chip">${esc(myName())}</div>
         <label class="q-label">${t("difficulty")}</label>
         ${difficultySelect("q-diff")}
         <label class="q-label">${t("rounds")}</label>
@@ -419,7 +441,7 @@ function renderPre() {
         <button class="q-link" data-act="landing">‹ ${t("back")}</button>
         <h2 class="q-h2">${isCreate ? t("create") : t("join")}</h2>
         <label class="q-label">${t("your_name")}</label>
-        <input class="q-input" id="q-name" maxlength="16" value="${esc(drafts.name)}" placeholder="${t("your_name")}" />
+        <div class="q-input q-name-chip">${esc(myName())}</div>
         ${isCreate ? "" : `
           <label class="q-label">${t("room_code")}</label>
           <input class="q-input" id="q-code" maxlength="12" value="${esc(drafts.joinCode)}" placeholder="QN-ABCD" style="text-transform:uppercase" />`}
@@ -430,20 +452,20 @@ function renderPre() {
     `);
     return;
   }
-  $app.innerHTML = shell(`
-    <div class="q-hero">
-      <div class="q-emoji">👑</div>
-      <h1 class="q-brand">${t("brand")}</h1>
-      <p class="q-tagline">${t("tagline")}</p>
-      <div class="q-cta-row">
-        <button class="q-btn primary" data-act="go-create">${t("create")}</button>
-        <button class="q-btn ghost" data-act="go-join">${t("join")}</button>
-      </div>
-      <div class="q-cta-row">
-        <button class="q-btn ghost" data-act="go-solo">🧩 ${t("solo")}</button>
-      </div>
+  // Full-screen queens.png wallpaper. Create / Join / Play solo and the flags are
+  // painted into the image; transparent %-positioned hit-areas (shared .hit
+  // classes, queens positions under .qn-fs) sit over them.
+  $app.innerHTML = `<div class="qn-fs">
+    <div class="qn-stage">
+      <img class="qn-photo-img" src="/media/queens-full.png" alt="Queens — crown logic puzzle" width="1400" height="781" />
+      <button class="hit hit-create" data-act="go-create" aria-label="${esc(t("create"))}"></button>
+      <button class="hit hit-join" data-act="go-join" aria-label="${esc(t("join"))}"></button>
+      <button class="hit hit-solo" data-act="go-solo" aria-label="${esc(t("solo"))}"></button>
+      <button class="hit hit-flag hit-en ${lang === "en" ? "on" : ""}" data-lang="en" aria-label="English"></button>
+      <button class="hit hit-flag hit-fr ${lang === "fr" ? "on" : ""}" data-lang="fr" aria-label="Français"></button>
+      <button class="hit hit-flag hit-ar ${lang === "ar" ? "on" : ""}" data-lang="ar" aria-label="العربية"></button>
     </div>
-  `);
+  </div>`;
 }
 
 function renderLobby() {
@@ -714,4 +736,5 @@ $app.addEventListener("click", (e) => {
   }
 });
 
+refreshAccount();
 render();

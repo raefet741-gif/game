@@ -1,12 +1,16 @@
 // public/js/music.js — site-wide background music (ANIXIA — Samurai Spirit Ascension)
-// Loops at ~30% volume, resumes roughly where it left off across page navigations,
-// and can be muted by the player (choice remembered). Handles browsers that block
-// autoplay by starting on the first user interaction.
+// The site is a multi-page app, so a page navigation tears down the <audio> element
+// and JS context — the track can't literally keep playing. To make it *feel*
+// continuous we don't just re-open at the last saved spot (that replays the same
+// couple of seconds and sounds like a restart); instead we save the position with a
+// wall-clock timestamp and, on the next page, fast-forward past the navigation gap
+// so the music picks up exactly where it would be now. It only truly stops when the
+// player mutes it — that choice is remembered.
 (function () {
   var SRC = "/media/bg-music.mp3";
   var VOL = 0.3;
   var K_OFF = "kyuubi.music.off"; // "1" when the user muted it
-  var K_TIME = "kyuubi.music.t"; // last playback position (continuity across pages)
+  var K_TIME = "kyuubi.music.t"; // JSON {t: position seconds, at: epoch ms} — continuity across pages
 
   var off = localStorage.getItem(K_OFF) === "1";
 
@@ -15,25 +19,59 @@
   audio.preload = "auto";
   audio.volume = VOL;
 
-  // resume near where the previous page left off
-  var resumeAt = parseFloat(localStorage.getItem(K_TIME) || "0");
-  if (resumeAt > 0) {
-    audio.addEventListener("loadedmetadata", function () {
-      try { if (resumeAt < audio.duration - 1) audio.currentTime = resumeAt; } catch (e) {}
-    });
+  // Read the saved {position, timestamp}. Back-compat: an old plain-number value is
+  // treated as a position saved "just now" (no fast-forward).
+  function readSaved() {
+    var raw = localStorage.getItem(K_TIME);
+    if (!raw) return { t: 0, at: Date.now() };
+    try {
+      var o = JSON.parse(raw);
+      if (o && typeof o.t === "number") return { t: o.t, at: typeof o.at === "number" ? o.at : Date.now() };
+    } catch (e) {}
+    var n = parseFloat(raw);
+    return { t: isNaN(n) ? 0 : n, at: Date.now() };
   }
 
-  // persist position so the next page continues from here
+  // Where should the track be right now? While unmuted we add the real time that has
+  // elapsed since the position was saved (which covers the page-load gap) so playback
+  // continues seamlessly. While muted we freeze at the saved spot so unmuting later
+  // resumes from there rather than jumping ahead by the muted duration.
+  function resumePosition() {
+    var s = readSaved();
+    var pos = s.t;
+    if (!off) pos += Math.max(0, (Date.now() - s.at) / 1000);
+    var dur = audio.duration;
+    if (dur && isFinite(dur) && dur > 0) pos = pos % dur; // the track loops
+    return pos > 0 ? pos : 0;
+  }
+  function applyResume() {
+    try {
+      var pos = resumePosition();
+      var dur = audio.duration;
+      if (!dur || !isFinite(dur) || pos < dur - 0.3) audio.currentTime = pos;
+    } catch (e) {}
+  }
+  // Metadata may already be available for a cached file; otherwise wait for it.
+  if (audio.readyState >= 1) applyResume();
+  else audio.addEventListener("loadedmetadata", applyResume, { once: true });
+
+  // Persist the position + a fresh timestamp so the next page can fast-forward. We
+  // only record while actually playing, so a muted/paused stretch never inflates the
+  // elapsed gap.
+  function save() {
+    if (audio.paused) return;
+    try { localStorage.setItem(K_TIME, JSON.stringify({ t: audio.currentTime, at: Date.now() })); } catch (e) {}
+  }
   var lastSave = 0;
   audio.addEventListener("timeupdate", function () {
     var now = Date.now();
-    if (now - lastSave > 2000) {
-      lastSave = now;
-      try { localStorage.setItem(K_TIME, String(audio.currentTime)); } catch (e) {}
-    }
+    if (now - lastSave > 1000) { lastSave = now; save(); }
   });
-  window.addEventListener("pagehide", function () {
-    try { localStorage.setItem(K_TIME, String(audio.currentTime)); } catch (e) {}
+  // Save on the way out — pagehide/visibilitychange fire reliably on navigation and
+  // tab-switch where "unload" no longer does.
+  window.addEventListener("pagehide", save);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") save();
   });
 
   // autoplay is blocked until a gesture on most browsers → arm a one-shot starter
@@ -46,13 +84,17 @@
       document.removeEventListener("pointerdown", start);
       document.removeEventListener("keydown", start);
       document.removeEventListener("touchstart", start);
-      if (!off) audio.play().catch(function () {});
+      // Fast-forward past however long autoplay stayed blocked, then start.
+      if (!off) { applyResume(); audio.play().catch(function () {}); }
     };
     document.addEventListener("pointerdown", start, { once: true });
     document.addEventListener("keydown", start, { once: true });
     document.addEventListener("touchstart", start, { once: true });
   }
+  // Initial (cross-page) start: land at the seamless resume position, then play.
+  // Falls back to a first-gesture start when the browser blocks autoplay.
   function tryPlay() {
+    applyResume();
     var p = audio.play();
     if (p && p.catch) p.catch(function () { armGesture(); });
   }
