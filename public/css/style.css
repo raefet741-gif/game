@@ -1498,7 +1498,8 @@ button.bluff-opt:hover {
   background: #efe8da;
   z-index: 1;
 }
-.pz-stage {
+/* scoped under .pz-fs so it never touches the puzzle play screens' .pz-stage */
+.pz-fs .pz-stage {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1566,7 +1567,8 @@ button.bluff-opt:hover {
   background: #efe8da;
   z-index: 1;
 }
-.dd-stage {
+/* scoped under .dd-fs so it never touches the drawing canvas's .dd-stage */
+.dd-fs .dd-stage {
   position: absolute;
   top: 50%;
   left: 50%;
