@@ -56,9 +56,37 @@ open it, tap **Create a room**, and share the in-app link/QR with their friends.
 ### Free-tier caveats (all fine for a party game)
 - The service **sleeps after ~15 min with no visitors**; the next visit wakes it in
   ~30–60s (a one-time "spinning up" delay).
-- A sleep/restart **clears all rooms** (they're in memory). Just create a fresh room —
-  scores/history aren't meant to persist between sessions anyway.
+- A sleep/restart **clears all live rooms** (in-memory) — just create a fresh room.
 - Keep it at **one instance** (don't enable autoscaling).
+
+---
+
+## 🔑 Keep accounts across deploys (persistent database) — REQUIRED for prod
+
+Render's free filesystem is **ephemeral**: it's wiped on every deploy and every
+sleep/restart. The account DB (XP, coins, logins) is a local JSON file by default,
+so **without an external database it resets every time you push.**
+
+Fix it once by pointing the app at a free hosted Postgres:
+
+1. **Create a free Postgres** (any of these — pick one):
+   - **Neon** <https://neon.tech> — free, permanent, no card. Create a project and copy
+     the **connection string** (looks like `postgres://user:pass@ep-xxx.neon.tech/neondb`).
+   - **Supabase** <https://supabase.com> → Project → Settings → Database → *Connection string*.
+   - **Render Postgres** — New + → *Postgres* (free) → copy the **External Database URL**.
+2. **Add it to your web service** in Render: **Settings → Environment → Add Environment
+   Variable**:
+   - `DATABASE_URL` = the connection string you copied.
+3. **Redeploy** (Render does this automatically when you save the env var). On boot the log
+   prints `store: accounts loaded from Postgres (persistent).` — from now on accounts
+   survive every deploy.
+
+Nothing else to set up: the app creates its own tiny table automatically. Locally (no
+`DATABASE_URL`) it keeps using the JSON file, so dev is unchanged.
+
+> Note: the very first deploy *after* adding `DATABASE_URL` starts with an empty database
+> (the old file data was already ephemeral and can't be recovered) — but every deploy after
+> that keeps everything.
 
 ---
 

@@ -34,7 +34,7 @@ import {
 } from "./puzzle.js";
 import { POWERS } from "./powers.js";
 import { CATEGORY_LABELS } from "./questions.js";
-import { loadStore } from "./store.js";
+import { loadStore, flushNow } from "./store.js";
 import {
   register,
   login,
@@ -46,7 +46,7 @@ import {
   ACHIEVEMENTS,
 } from "./accounts.js";
 
-loadStore();
+await loadStore(); // may hit Postgres (DATABASE_URL) — await before serving
 
 let QRCode = null;
 try {
@@ -452,6 +452,18 @@ io.on("connection", (socket) => {
     room.broadcast();
   });
 });
+
+// On a deploy/restart the host sends SIGTERM — flush any pending account write
+// so the last change isn't lost to the save debounce, then exit.
+let shuttingDown = false;
+async function gracefulExit() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await flushNow();
+  process.exit(0);
+}
+process.on("SIGTERM", gracefulExit);
+process.on("SIGINT", gracefulExit);
 
 // Periodic cleanup of abandoned rooms.
 setInterval(() => {
